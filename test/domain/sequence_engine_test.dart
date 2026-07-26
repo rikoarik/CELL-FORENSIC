@@ -64,7 +64,15 @@ void main() {
 
     final m2 = engine.startForSequenceCode('misi-2');
     expect(m2?.config.code, 'SEQ-MISI-2');
-    expect(m2!.config.steps.first.code, SequenceStepCodes.focusSampleB);
+    expect(
+      m2!.config.steps.map((s) => s.code).toList(),
+      [
+        SequenceStepCodes.focusSampleB,
+        SequenceStepCodes.zoomMembrane,
+        SequenceStepCodes.showTornBilayer,
+        SequenceStepCodes.playLeakParticles,
+      ],
+    );
 
     final m3 = engine.startSequence(3);
     expect(m3?.config.code, 'SEQ-MISI-3');

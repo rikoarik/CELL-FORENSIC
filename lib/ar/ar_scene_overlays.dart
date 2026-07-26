@@ -127,6 +127,7 @@ class _ArOverlayPainter extends CustomPainter {
       case ArOverlayEffect.membraneDamage:
         paintMembraneDamage(canvas, frame);
       case ArOverlayEffect.waterLeak:
+        // PDF Misi 2: dark-blue water spray from membrane rim (not fullscreen).
         paintMembraneDamage(canvas, frame);
         paintWaterLeakParticles(canvas, frame, t: t);
       case ArOverlayEffect.cellWallHighlight:

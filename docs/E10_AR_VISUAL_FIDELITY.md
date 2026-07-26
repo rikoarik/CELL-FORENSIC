@@ -287,3 +287,35 @@ MISI-3  show_both_samples     → live tabletop AR
 - Placement / `labTableModelPath` never cleared by M1 steps.
 - `MissionSequences.misi1` still four steps only; sequence engine does not start M2/M3.
 - Group / session / LKPD flows untouched.
+
+---
+
+## Wave 2 — Misi 2
+
+**Owner:** mission-2-agent (`wave2/misi-2-visual`)  
+**Scope:** `SEQ-MISI-2` visuals only — `ar_visual_director.dart` M2 cases, `sequence_engine.dart` M2 docs/order, `misi2_visual_helpers.dart`, membrane-anchored `waterLeak` paint. **Did not** edit `ar_scene_engine.dart`.  
+**Date:** 2026-07-26.  
+**PDF SoT:** Zoom ke lapisan terluar Sampel B → bilayer diperbesar (normal) → ekor fosfolipid terputus (robek) → partikel air biru tua menyembur dari dalam sel / area membran.
+
+### Visual steps (tabletop, same lab anchor)
+
+| # | Step code | Visual | Assets / overlay |
+|---|---|---|---|
+| 1 | `focus_sample_b` | Focus Sampel B outer; membrane highlight; clear secondary | `SelHewanBroken.glb` · overlay `none` |
+| 2 | `zoom_membrane` | Zoom bilayer **intact** (normal) — scale-up primary + membrane; **no** damage ring yet | `SelHewanBroken.glb` · overlay `none` |
+| 3 | `show_torn_bilayer` | Torn phospholipid bilayer (broken hydrophobic tails) | `RantaiProtein.glb` proxy · `membraneDamage` |
+| 4 | `play_leak_particles` | Dark-blue (`#1E3A8A`) water spheres spray **from membrane rim** (not fullscreen) | Keep `RantaiProtein` · `waterLeak` + `highlightTarget=membrane` |
+
+### Fixes vs Wave 1 gaps
+
+| Wave 1 gap | Wave 2 change |
+|---|---|
+| `zoom_membrane` also showed `membraneDamage` (conflated normal/torn) | Intact zoom has `overlay=none`; damage only on `show_torn_bilayer` |
+| Leak was light-blue drops, not membrane-local | `_membraneWaterSpray` dark-blue radial exit from membrane origin when `highlightTarget == membrane` |
+| Leak highlight not forced to membrane | `Misi2VisualHelpers.playMembraneLeakParticles` always sets membrane highlight |
+
+### Guarantees
+
+- Placement / `labTableModelPath` preserved across all four steps (no re-place).
+- Sequence order unchanged: `focus → zoom (normal) → torn → leak`.
+- Native particle emitter still unavailable — Flutter anchored overlay stands in (E0 Fail).
