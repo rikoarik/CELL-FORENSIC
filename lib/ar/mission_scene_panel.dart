@@ -476,6 +476,7 @@ class _MissionScenePanelState extends State<MissionScenePanel>
             effect: visual.overlay,
             highlightTarget: visual.highlightTarget,
             opacity: visual.opacity,
+            dualSamples: visual.secondaryModelPath != null,
           ),
           if (widget.sequencePaused)
             ColoredBox(
@@ -656,6 +657,7 @@ class _MissionScenePanelState extends State<MissionScenePanel>
           effect: visual.overlay,
           highlightTarget: visual.highlightTarget,
           opacity: visual.opacity,
+          dualSamples: visual.secondaryModelPath != null,
         ),
       ],
     );
@@ -675,6 +677,7 @@ class _MissionScenePanelState extends State<MissionScenePanel>
             effect: visual.overlay,
             highlightTarget: visual.highlightTarget,
             opacity: visual.opacity,
+            dualSamples: visual.secondaryModelPath != null,
           ),
         if (_scanPhase != ArScanPhase.placed)
           Align(

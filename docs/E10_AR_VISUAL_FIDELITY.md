@@ -221,3 +221,38 @@ MISI-3  show_both_samples     → live tabletop AR
 - Does **not** force `model_viewer` fallback (live activation owned elsewhere).
 - Does **not** change group/session/LKPD/POS/auth flows.
 - Overlay painters / mission directors consume these APIs in sibling Wave 2 agents.
+
+---
+
+## Wave 2 — Overlays
+
+**Mode:** IMPLEMENT (Flutter overlays bound to AR targets).  
+**Date:** 2026-07-26.  
+**Branch:** `wave2/ar-overlay-effects`  
+**Owns:** `lib/ar/ar_overlay_frame.dart`, `lib/ar/ar_overlay_painters.dart`, `lib/ar/ar_scene_overlays.dart`; wiring in `mission_scene_panel.dart`.  
+**Does not edit:** `ar_scene_engine.dart` (uses existing `showAnchoredOverlayEffect` / `ArOverlayEffect`).
+
+### Why overlays
+
+`ar_flutter_plugin_2` has no native material glow and no particle emitter (E0 / Wave 1). Mission beats that need those cues are realized as model-frame Flutter paints on top of live `ARView` and ModelViewer fallback.
+
+### Overlay list (PDF-aligned)
+
+| Overlay | Effect enum | Mission | Visual |
+|---|---|---|---|
+| Yellow chloroplast glow | `chloroplastHighlight` | M1 `glow_organelles` / `zoom_internal` | Soft yellow radial glow + inner core on kloroplas (left of Sample A) — was green |
+| Vacuole shrink rings | `vacuoleDamage` | M1 `play_shrink_animation` | Cyan glow + concentric shrink rings on Sample A |
+| Membrane tear ring | `membraneDamage` | M2 zoom / torn bilayer | Red dashed ring on outer membrane |
+| Dark-blue water particles | `waterLeak` | M2 `play_leak_particles` | Animated deep-blue droplets spraying **from membrane rim only** (not fullscreen) |
+| Green cell-wall contour | `cellWallHighlight` | M3 `highlight_cell_wall` | Green double contour / outline on Sample A — was amber glow |
+| Red cross on Sample B | `missingStructureCross` | M3 `mark_sample_b` | Red X + label anchored to Sample B (right when dual) |
+| Force arrows | `forceArrows` | M3 `show_force_arrows` | 8 radial inward amber arrows on Sample A; outward red cues on Sample B when dual |
+| Comparison labels | `comparisonLabels` | M3 `show_both_samples` | Sampel A / Sampel B labels at dual anchors |
+
+### Frame binding
+
+`ArOverlayFrame` maps the scene rect to Sample A (center or left) and Sample B (right when `dualSamples`). `mission_scene_panel` passes `dualSamples: visual.secondaryModelPath != null` for live AR, ModelViewer fallback, and test placeholder — same overlay layer on all three paths.
+
+### Animation
+
+`ArSceneOverlayLayer` is stateful with a repeating ticker for `waterLeak`, `chloroplastHighlight`, and `forceArrows` so particles/glow stay alive without native emitters.
