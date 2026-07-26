@@ -10,6 +10,7 @@ class DashboardSessionSnapshot {
     required this.session,
     required this.groups,
     this.pendingReviewCount = 0,
+    this.pendingReviewByGroupId = const {},
   });
 
   final LearningSession session;
@@ -17,6 +18,15 @@ class DashboardSessionSnapshot {
 
   /// Essay / provisional answers still awaiting teacher score across the session.
   final int pendingReviewCount;
+
+  /// Per-group pending review counts (same source as [pendingReviewCount]).
+  final Map<String, int> pendingReviewByGroupId;
+
+  int get memberCount =>
+      groups.fold(0, (sum, g) => sum + g.members.length);
+
+  int pendingForGroup(String groupId) =>
+      pendingReviewByGroupId[groupId] ?? 0;
 }
 
 /// Loads teacher sessions, group detail, reviews, and export rows (E6 / E9).
@@ -129,6 +139,7 @@ class SupabaseDashboardSessionRepository implements DashboardSessionRepository {
           .eq('session_id', session.id);
 
       final groups = <Group>[];
+      final pendingByGroup = <String, int>{};
       var pending = 0;
       for (final g in groupRows as List) {
         final gm = Map<String, Object?>.from(g as Map);
@@ -147,13 +158,16 @@ class SupabaseDashboardSessionRepository implements DashboardSessionRepository {
           members: members,
         );
         groups.add(group);
-        pending += await _countPendingReviews(group.id);
+        final groupPending = await _countPendingReviews(group.id);
+        pendingByGroup[group.id] = groupPending;
+        pending += groupPending;
       }
       snapshots.add(
         DashboardSessionSnapshot(
           session: session,
           groups: groups,
           pendingReviewCount: pending,
+          pendingReviewByGroupId: pendingByGroup,
         ),
       );
     }
@@ -503,7 +517,7 @@ class SupabaseDashboardSessionRepository implements DashboardSessionRepository {
     if (row == null) {
       throw StateError(
         'Gagal mengubah status sesi. Pastikan Anda pemilik sesi '
-        '(teacher_id) atau admin — sesi demo tanpa pemilik tidak bisa diubah.',
+        '(teacher_id) atau admin — sesi tanpa pemilik tidak bisa diubah.',
       );
     }
     return LearningSession.fromJson(Map<String, Object?>.from(row));
@@ -641,7 +655,7 @@ class FakeDashboardSessionRepository implements DashboardSessionRepository {
             const [
               ContentVersionOption(
                 id: 'c1',
-                versionCode: 'v1-demo',
+                versionCode: 'v1',
               ),
             ];
 
@@ -790,6 +804,7 @@ class FakeDashboardSessionRepository implements DashboardSessionRepository {
           session: session,
           groups: snap.groups,
           pendingReviewCount: snap.pendingReviewCount,
+          pendingReviewByGroupId: snap.pendingReviewByGroupId,
         ),
       );
     }

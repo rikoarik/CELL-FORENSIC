@@ -17,10 +17,13 @@ class ArAssetRegistry {
   static bool get organelleLabelsSafe =>
       OrganelleLabelMap.assertProvisionalRules();
 
-  static const mejaLab = 'assets/ar_models/Meja/MejaLab.glb';
+  static const mejaLab = 'assets/ar_models/Meja/MejaLab_Putih.glb';
   static const sampleA =
-      'assets/ar_models/SelTumbuhan/SelTumbuhanRework_AllInOne.glb';
-  static const sampleB = 'assets/ar_models/SelHewan/SelHewanBroken.glb';
+      'assets/ar_models/SelTumbuhan/SelTumbuhanRework_Export 2 normal color.glb';
+  static const sampleADamaged =
+      'assets/ar_models/SelTumbuhan/SelTumbuhanRework_Export 1 normal color.glb';
+  static const sampleB =
+      'assets/ar_models/SelHewan/SelHewanBroken_NewExport.glb';
 
   static const nukleusSolo =
       'assets/ar_models/SelTumbuhan/SelTumbuhhanSolo/Nukleus_Solo.glb';
@@ -63,7 +66,8 @@ class ArAssetRegistry {
       ('MISI-2', 'show_torn_bilayer') => rantaiProtein,
       ('MISI-2', 'play_leak_particles') => rantaiProtein,
 
-      // Misi 3 — bandingkan lapisan terluar (never mitokondriaSolo on arrows).
+      // Misi 3 — damaged A glow then bandingkan (never mitokondriaSolo on arrows).
+      ('MISI-3', 'show_damaged_sample_a') => sampleADamaged,
       ('MISI-3', 'show_both_samples') => sampleA,
       ('MISI-3', 'highlight_cell_wall') => dindingSelSolo,
       ('MISI-3', 'mark_sample_b') => sampleA,
@@ -88,6 +92,7 @@ class ArAssetRegistry {
       'zoom_membrane' => '0deg 65deg 1.4m',
       'highlight_cell_wall' => '40deg 55deg 1.8m',
       'show_torn_bilayer' || 'play_leak_particles' => '10deg 80deg 1.2m',
+      'show_damaged_sample_a' => '20deg 55deg 1.6m',
       'show_both_samples' || 'show_force_arrows' => '0deg 70deg 2.8m',
       _ => '0deg 75deg 2.2m',
     };

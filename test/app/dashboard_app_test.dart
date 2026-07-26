@@ -25,9 +25,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Ringkasan Sesi'), findsOneWidget);
     expect(find.text('Belum ada sesi'), findsOneWidget);
     expect(find.byKey(const Key('dashboard-wide-layout')), findsOneWidget);
+    expect(find.byKey(const Key('nav-overview')), findsOneWidget);
+    expect(find.byKey(const Key('nav-review')), findsOneWidget);
     expect(find.bySemanticsLabel('Ringkasan sesi praktikum'), findsOneWidget);
   });
 
@@ -52,6 +53,11 @@ void main() {
   testWidgets('dashboard menampilkan sesi aktif dan navigasi ke detail kelompok', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     const session = LearningSession(
       id: 's1',
       joinCode: 'CELL01',
@@ -151,6 +157,11 @@ void main() {
   testWidgets('tombol ekspor CSV menyalin ke papan klip di lingkungan uji', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
       SystemChannels.platform,
       (call) async {
@@ -206,9 +217,107 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('export-csv-s1')));
+    final export = find.byKey(const Key('export-csv-s1'));
+    await tester.ensureVisible(export);
+    await tester.pumpAndSettle();
+    await tester.tap(export);
     await tester.pumpAndSettle();
 
     expect(find.textContaining('CSV disalin'), findsOneWidget);
+  });
+
+  testWidgets('antrian review menonjolkan kelompok yang menunggu nilai', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const session = LearningSession(
+      id: 's1',
+      joinCode: 'CELL01',
+      contentVersionId: 'c1',
+      status: SessionStatus.active,
+      stationDurationSeconds: 300,
+      title: 'Praktikum Demo',
+    );
+    const group = Group(
+      id: 'g1',
+      sessionId: 's1',
+      name: 'Kelompok Mawar',
+      members: [
+        GroupMember(id: 'm1', displayName: 'Ani', isLeader: true),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DashboardHome(
+          repository: FakeDashboardSessionRepository([
+            DashboardSessionSnapshot(
+              session: session,
+              groups: const [group],
+              pendingReviewCount: 2,
+              pendingReviewByGroupId: const {'g1': 2},
+            ),
+          ]),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('dashboard-attention-banner')), findsOneWidget);
+    expect(find.text('Ringkasan Sesi'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('nav-review')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Antrian Review'), findsWidgets);
+    expect(find.byKey(const Key('review-group-g1')), findsOneWidget);
+    expect(find.textContaining('2 menunggu review'), findsWidgets);
+  });
+
+  testWidgets('pencarian memfilter sesi berdasarkan kode gabung', (tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final fake = FakeDashboardSessionRepository([
+      const DashboardSessionSnapshot(
+        session: LearningSession(
+          id: 's1',
+          joinCode: 'CELL01',
+          contentVersionId: 'c1',
+          status: SessionStatus.active,
+          stationDurationSeconds: 300,
+          title: 'Praktikum A',
+        ),
+        groups: [],
+      ),
+      const DashboardSessionSnapshot(
+        session: LearningSession(
+          id: 's2',
+          joinCode: 'LAB99',
+          contentVersionId: 'c1',
+          status: SessionStatus.draft,
+          stationDurationSeconds: 300,
+          title: 'Praktikum B',
+        ),
+        groups: [],
+      ),
+    ]);
+
+    await tester.pumpWidget(
+      MaterialApp(home: DashboardHome(repository: fake)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('dashboard-search')), 'lab99');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Praktikum B'), findsOneWidget);
+    expect(find.text('Praktikum A'), findsNothing);
   });
 }

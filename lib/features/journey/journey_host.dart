@@ -126,12 +126,27 @@ class _JourneyHostState extends State<JourneyHost> {
               child: MediaQuery.removePadding(
                 context: context,
                 removeTop: true,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  child: KeyedSubtree(
-                    key: ValueKey(_journey.stage),
-                    child: screen,
-                  ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final wide = constraints.maxWidth >= 900;
+                    final child = AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      child: KeyedSubtree(
+                        key: ValueKey(_journey.stage),
+                        child: screen,
+                      ),
+                    );
+                    if (!wide) return child;
+                    return ColoredBox(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 720),
+                          child: child,
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),

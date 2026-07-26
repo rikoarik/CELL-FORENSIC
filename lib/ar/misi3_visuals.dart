@@ -1,12 +1,14 @@
 import 'package:cell_forensic/ar/ar_asset_registry.dart';
 import 'package:cell_forensic/ar/ar_scene_engine.dart';
+import 'package:cell_forensic/ar/misi1_visuals.dart';
 
 /// Misi 3–only tabletop choreography helpers (PDF Scene 2 / SEQ-MISI-3).
 ///
-/// PDF beats: A+B side-by-side → green cell-wall contour on A → red X on B →
-/// force arrows (wall resists pressure). Always on the same lab-table anchor;
+/// Beats: damaged Sample A glow → A+B side-by-side → green cell-wall contour
+/// on A → red X on B → force arrows. Always on the same lab-table anchor;
 /// never re-places. Dedicated force-arrow GLB is unavailable — arrows are an
-/// [ArOverlayEffect.forceArrows] Flutter overlay.
+/// [ArOverlayEffect.forceArrows] Flutter overlay. Native material glow is
+/// unavailable — yellow chloroplast glow is a Flutter overlay approximation.
 abstract final class Misi3Visuals {
   /// Shared A↔B separation so both samples keep comparable proportions.
   static const sideBySideOffsetX = 0.14;
@@ -36,6 +38,16 @@ abstract final class Misi3Visuals {
     await engine.setNodeScale(ArNodeIds.sampleA, comparisonScale);
     await engine.setNodeScale(ArNodeIds.sampleB, comparisonScale);
     await engine.setOpacity(1);
+  }
+
+  /// Step `show_damaged_sample_a` — plant cell with Flutter glow (no B yet).
+  static Future<void> showDamagedSampleA(ArSceneEngine engine) async {
+    await _stayOnTabletop(engine);
+    await engine.setSecondaryModel(null);
+    await engine.replaceModelAtActiveAnchor(ArAssetRegistry.sampleADamaged);
+    await engine.setNodeScale(ArNodeIds.primary, comparisonScale);
+    await engine.setNodeScale(ArNodeIds.sampleA, comparisonScale);
+    await Misi1Visuals.glowOrganelles(engine);
   }
 
   /// Step `show_both_samples` — Sampel A + Sampel B side-by-side.

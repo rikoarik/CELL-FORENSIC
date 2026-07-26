@@ -10,6 +10,42 @@ void main() {
   test('journey starts at device check', () {
     final journey = StudentJourney(content: _pack());
     expect(journey.stage, JourneyStage.deviceCheck);
+    expect(journey.canGoBack, isFalse);
+  });
+
+  test('goBack steps one stage without clearing join data', () {
+    final journey = StudentJourney(content: _pack())
+      ..completeDeviceCheck(arSupported: false)
+      ..joinWithGroup(groupName: 'Alpha', leaderName: 'Budi');
+    expect(journey.stage, JourneyStage.investigating);
+    expect(journey.canGoBack, isTrue);
+
+    journey.goBack();
+    expect(journey.stage, JourneyStage.groupSetup);
+    expect(journey.groupName, 'Alpha');
+
+    journey.goBack();
+    expect(journey.stage, JourneyStage.joinSession);
+
+    journey.goBack();
+    expect(journey.stage, JourneyStage.deviceCheck);
+    expect(journey.canGoBack, isFalse);
+  });
+
+  test('enableLiveAr upgrades Mode 3D without leaving investigating stage', () {
+    final journey = StudentJourney(content: _pack())
+      ..completeDeviceCheck(arSupported: false)
+      ..joinWithGroup(groupName: 'Alpha', leaderName: 'Budi');
+    expect(journey.arSupported, isFalse);
+    expect(journey.stage, JourneyStage.investigating);
+
+    journey.markLabPlaced();
+    expect(journey.labPlaced, isTrue);
+
+    journey.enableLiveAr();
+    expect(journey.arSupported, isTrue);
+    expect(journey.labPlaced, isFalse);
+    expect(journey.stage, JourneyStage.investigating);
   });
 
   test('progresses device check -> join -> group -> Scene 1 AR (no Misi 1)', () {

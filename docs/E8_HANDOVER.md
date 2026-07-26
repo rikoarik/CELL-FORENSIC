@@ -74,7 +74,7 @@ flutter run -d chrome -t lib/main_dashboard.dart \
   --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
 ```
 
-Login email/password guru diperlukan (`TeacherAuthGate`). Buat guru pertama: `docs/E9_TEACHER_AUTH.md` → `promote_user_to_teacher`.
+Login email/password guru diperlukan (`TeacherAuthGate`). Demo pilot: `guru@cellforensic.demo` — lihat `docs/E9_TEACHER_AUTH.md` → **Demo credentials**. Buat guru baru: `promote_user_to_teacher` (prosedur di E9).
 
 ## 5. Flavors
 

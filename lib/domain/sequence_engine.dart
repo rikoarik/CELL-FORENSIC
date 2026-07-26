@@ -96,7 +96,10 @@ abstract final class SequenceStepCodes {
   /// Dark-blue water particles exiting from the membrane area (anchored overlay).
   static const playLeakParticles = 'play_leak_particles';
 
-  // --- Misi 3: compare outer layers of A and B ---
+  // --- Misi 3: damaged A glow prelude, then compare outer layers ---
+  /// Damaged Sample A (plant cell) with Flutter glow before A+B compare.
+  static const showDamagedSampleA = 'show_damaged_sample_a';
+
   /// Show Sample A + Sample B side-by-side on the same tabletop anchor.
   static const showBothSamples = 'show_both_samples';
 
@@ -151,15 +154,17 @@ abstract final class MissionSequences {
     ],
   );
 
-  /// Misi 3 — PDF Scene 2 comparison (SEQ-MISI-3 only; does not chain M1/M2):
-  /// 1. A+B side-by-side on tabletop (matched proportions)
-  /// 2. green cell-wall contour on A (`DindingSel_Solo`)
-  /// 3. red X on B (no wall)
-  /// 4. force arrows — wall resists pressure (stay dinding/sampleA; never
+  /// Misi 3 — damaged plant cell glow, then PDF Scene 2 comparison:
+  /// 1. damaged Sample A + yellow glow (Flutter overlay)
+  /// 2. A+B side-by-side on tabletop (matched proportions)
+  /// 3. green cell-wall contour on A (`DindingSel_Solo`)
+  /// 4. red X on B (no wall)
+  /// 5. force arrows — wall resists pressure (stay dinding/sampleA; never
   ///    swap to mitokondriaSolo)
   static const misi3 = SequenceConfig(
     code: 'SEQ-MISI-3',
     steps: [
+      SequenceStep(code: SequenceStepCodes.showDamagedSampleA),
       SequenceStep(code: SequenceStepCodes.showBothSamples),
       SequenceStep(code: SequenceStepCodes.highlightCellWall),
       SequenceStep(code: SequenceStepCodes.markSampleB),

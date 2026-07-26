@@ -119,6 +119,7 @@ class SessionSnapshot {
     this.sequenceStepIndex,
     this.sequenceCompleted = false,
     this.logbookByMission = const {},
+    this.inspectedOrganelleHotspots = const [],
     this.conclusionDraft,
     this.stationIndex = 0,
     this.activeStationUnlocked = false,
@@ -177,6 +178,14 @@ class SessionSnapshot {
       }
     }
 
+    final inspectedRaw = json['inspected_organelle_hotspots'];
+    final inspected = <String>[];
+    if (inspectedRaw is List) {
+      for (final item in inspectedRaw) {
+        inspected.add(item.toString());
+      }
+    }
+
     return SessionSnapshot(
       stageName: (json['stage'] as String?) ?? 'groupSetup',
       arSupported: json['ar_supported'] as bool? ?? false,
@@ -191,6 +200,7 @@ class SessionSnapshot {
       sequenceStepIndex: json['sequence_step_index'] as int?,
       sequenceCompleted: json['sequence_completed'] as bool? ?? false,
       logbookByMission: logbook,
+      inspectedOrganelleHotspots: inspected,
       conclusionDraft: draft,
       stationIndex: json['station_index'] as int? ?? 0,
       activeStationUnlocked: json['active_station_unlocked'] as bool? ?? false,
@@ -219,6 +229,11 @@ class SessionSnapshot {
   final int? sequenceStepIndex;
   final bool sequenceCompleted;
   final Map<String, Map<String, String>> logbookByMission;
+
+  /// Sample A organelle observation ids (`chloroplast` | `vacuole`).
+  /// Separate from mission completion — may persist across reset scan.
+  final List<String> inspectedOrganelleHotspots;
+
   final ConclusionDraft? conclusionDraft;
 
   /// 0-based POS station index (E5-06).
@@ -258,6 +273,8 @@ class SessionSnapshot {
     'logbook_by_mission': {
       for (final e in logbookByMission.entries) e.key: e.value,
     },
+    if (inspectedOrganelleHotspots.isNotEmpty)
+      'inspected_organelle_hotspots': inspectedOrganelleHotspots,
     if (conclusionDraft != null) 'conclusion_draft': conclusionDraft!.toJson(),
     'station_index': stationIndex,
     'active_station_unlocked': activeStationUnlocked,

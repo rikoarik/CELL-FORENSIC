@@ -43,3 +43,9 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Explicit for ArCoreApk.checkAvailability in MainActivity (FR-010).
+    // Also pulled transitively via ar_flutter_plugin_2 / arsceneview.
+    implementation("com.google.ar:core:1.48.0")
+}

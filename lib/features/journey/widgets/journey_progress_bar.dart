@@ -19,34 +19,56 @@ class JourneyProgressBar extends StatelessWidget {
     return Semantics(
       label: '$title. $subtitle',
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        padding: const EdgeInsets.fromLTRB(8, 10, 16, 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(title, style: theme.textTheme.titleMedium),
-            const SizedBox(height: 2),
             Row(
               children: [
+                if (journey.canGoBack)
+                  IconButton(
+                    key: const Key('journey-back-button'),
+                    tooltip: 'Kembali',
+                    onPressed: journey.goBack,
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    visualDensity: VisualDensity.compact,
+                  )
+                else
+                  const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    subtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-                Text(
-                  '${(value * 100).round()}%',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: theme.colorScheme.secondary,
-                  ),
+                  child: Text(title, style: theme.textTheme.titleMedium),
                 ),
               ],
             ),
+            const SizedBox(height: 2),
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${(value * 100).round()}%',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: theme.colorScheme.secondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(value: value, minHeight: 6),
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(value: value, minHeight: 6),
+              ),
             ),
           ],
         ),
@@ -82,7 +104,7 @@ class JourneyProgressBar extends StatelessWidget {
         journey.arSupported ? 'Investigasi AR' : 'Investigasi 3D',
         journey.labPlaced
             ? (journey.runningMissionNumber != null
-                  ? 'Misi ${journey.runningMissionNumber} aktif (intent)'
+                  ? journey.activeMission.title
                   : 'Lab siap · tanya asisten untuk misi')
             : 'Scene 1 · pindai meja laboratorium',
         0.15 +

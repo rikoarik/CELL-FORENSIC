@@ -32,7 +32,9 @@ class CellForensicApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Cell Forensic',
+      title: experience == AppExperience.dashboard
+          ? 'Cell Forensic — Dashboard Guru'
+          : 'Cell Forensic',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       home: experience == AppExperience.mobile

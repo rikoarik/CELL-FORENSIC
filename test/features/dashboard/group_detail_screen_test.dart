@@ -114,6 +114,11 @@ void main() {
       {group.id: buildDetail()},
     );
 
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     await tester.pumpWidget(
       MaterialApp(
         home: GroupDetailScreen(
@@ -128,11 +133,14 @@ void main() {
     expect(find.text('Kelompok Mawar'), findsOneWidget);
     expect(find.textContaining('Ani'), findsWidgets);
     expect(find.textContaining('MISI-1'), findsOneWidget);
-    expect(find.textContaining('Sel tumbuhan'), findsOneWidget);
     expect(find.textContaining('Sampel A'), findsWidgets);
     expect(find.textContaining('Skor otomatis: 10/10'), findsOneWidget);
     expect(find.textContaining('menunggu review'), findsOneWidget);
     expect(find.text('Nilai esai'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('group-detail-tab-kesimpulan')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Sel tumbuhan'), findsOneWidget);
   });
 
   testWidgets('menyimpan penilaian esai dari sheet review', (tester) async {
@@ -160,7 +168,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final reviewButton = find.byKey(const Key('review-button-a2'));
-    await tester.scrollUntilVisible(reviewButton, 200);
+    await tester.ensureVisible(reviewButton);
     await tester.tap(reviewButton);
     await tester.pumpAndSettle();
 
@@ -186,6 +194,11 @@ void main() {
       ],
       {group.id: buildDetail()},
     );
+
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
       MaterialApp(

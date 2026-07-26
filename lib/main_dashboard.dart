@@ -5,6 +5,9 @@ import 'app/cell_forensic_app.dart';
 
 /// Flutter Web teacher dashboard entry (E1-02).
 ///
+/// Not the default `flutter run -d chrome` target — that loads student
+/// [main.dart]. Use this file explicitly:
+///
 /// ```bash
 /// flutter run -d chrome -t lib/main_dashboard.dart
 /// ```

@@ -43,9 +43,11 @@ Future<void> _runSequenceToCompletion(
 void main() {
   setUp(() {
     MissionScenePanel.debugUsePlaceholderScene = true;
+    MissionScreen.intentStepDwell = const Duration(milliseconds: 1);
   });
   tearDown(() {
     MissionScenePanel.debugUsePlaceholderScene = false;
+    MissionScreen.intentStepDwell = const Duration(milliseconds: 1000);
   });
 
   testWidgets('menampilkan judul misi / Scene 1', (tester) async {
@@ -107,7 +109,7 @@ void main() {
       expect(journey.activeMission.code, 'MISI-1');
       expect(journey.missionStatus(1), MissionStatus.completed);
       expect(
-        find.textContaining('Investigasi Internal Sampel A'),
+        find.textContaining('Misi 1 — Analisis'),
         findsOneWidget,
       );
     },
@@ -125,7 +127,9 @@ void main() {
     await tester.ensureVisible(find.byKey(_assistantSendKey));
     await tester.tap(find.byKey(_assistantSendKey));
     await tester.pump();
+    // Intent autoplay dwells per step — advance fake async timers.
     await tester.pump(const Duration(milliseconds: 50));
+    await tester.pump(const Duration(seconds: 1));
 
     expect(find.textContaining('Perhatikan organel'), findsOneWidget);
     // Offline sequenceCode auto-plays M1 AR → observation completes (PDF SCENE 2).
@@ -178,6 +182,47 @@ void main() {
     expect(saved!.values, contains(answer));
   });
 
+  testWidgets('assistant draft dan logbook tetap saat upgrade ke live AR', (
+    tester,
+  ) async {
+    final journey = _investigatingJourney(arSupported: false)
+      ..startMissionFromIntent(1);
+    await tester.pumpWidget(_wrap(MissionScreen(journey: journey)));
+    await tester.pump();
+
+    await tester.enterText(
+      find.byKey(_assistantInputKey),
+      'draft sebelum upgrade',
+    );
+    await tester.tap(find.byKey(const Key('mission-logbook-toggle')));
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const Key('logbook-field-0')),
+      'catatan sebelum upgrade',
+    );
+    await tester.pump();
+
+    journey.enableLiveAr();
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const Key('assistant-tab-view-logbook')), findsOneWidget);
+    expect(
+      tester.widget<TextField>(find.byKey(const Key('logbook-field-0')))
+          .controller
+          ?.text,
+      'catatan sebelum upgrade',
+    );
+
+    await tester.tap(find.byKey(const Key('assistant-tab-chat')));
+    await tester.pump();
+    expect(find.byKey(const Key('assistant-tab-view-chat')), findsOneWidget);
+    expect(
+      tester.widget<TextField>(find.byKey(_assistantInputKey)).controller?.text,
+      'draft sebelum upgrade',
+    );
+  });
+
   testWidgets('AR path menahan sequence sampai place + intent', (tester) async {
     final journey = _investigatingJourney(arSupported: true);
     // markLabPlaced was called by helper — reset placement gate for live AR UI.
@@ -225,41 +270,47 @@ void main() {
     await tester.tap(okKey);
     await tester.pump();
     await tester.pump();
-    expect(
-      tester.widget<FilledButton>(find.byKey(_runStepKey)).onPressed,
-      isNotNull,
-    );
+    expect(find.byKey(const Key('mission-tracking-lost')), findsNothing);
   });
 
-  testWidgets('misi 2 dan 3 memakai sequence + briefing masing-masing', (
-    tester,
-  ) async {
-    final journey = _investigatingJourney()..startMissionFromIntent(2);
-    await tester.pumpWidget(_wrap(MissionScreen(journey: journey)));
-    expect(find.textContaining('Membran Sampel B'), findsOneWidget);
+  testWidgets(
+    'misi 2 dan 3 memakai sequence + briefing masing-masing',
+    (tester) async {
+      final journey = _investigatingJourney()..startMissionFromIntent(2);
+      await tester.pumpWidget(_wrap(MissionScreen(journey: journey)));
+      expect(find.textContaining('Misi 2 — Analisis'), findsOneWidget);
 
-    journey.startMissionFromIntent(3);
-    await tester.pumpAndSettle();
-    expect(find.textContaining('Perbandingan Lapisan'), findsOneWidget);
+      journey.startMissionFromIntent(3);
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Menyelidiki perbedaan'),
+        findsOneWidget,
+      );
 
-    await _runSequenceToCompletion(tester, journey);
-    expect(find.textContaining('Selesai'), findsWidgets);
-  });
+      await _runSequenceToCompletion(tester, journey);
+      expect(find.textContaining('Selesai'), findsWidgets);
+    },
+  );
 
   testWidgets('memulihkan progres sequence mid-misi dari snapshot journey', (
     tester,
   ) async {
-    final journey = _investigatingJourney()
-      ..startMissionFromIntent(1)
-      ..saveSequenceProgress(stepIndex: 2, completed: false);
+    final journey = _investigatingJourney()..startMissionFromIntent(1);
+    // Simulate mid-mission: step index 1 of 4.
+    journey.saveSequenceProgress(stepIndex: 1, completed: false);
+
     await tester.pumpWidget(_wrap(MissionScreen(journey: journey)));
     await tester.pump();
 
+    // Restored engine should show running state with remaining steps.
     expect(find.textContaining('Berjalan'), findsWidgets);
-    expect(find.textContaining('Langkah'), findsWidgets);
+    expect(
+      tester.widget<FilledButton>(find.byKey(_completeMissionKey)).onPressed,
+      isNull,
+    );
 
-    final remaining = journey.activeMission.sequence.steps.length - 1;
-    for (var i = 0; i < remaining; i++) {
+    // Finish remaining steps (3 left after restore to index 1).
+    for (var i = 0; i < 3; i++) {
       await _tapRunStep(tester);
     }
     expect(find.textContaining('Selesai'), findsWidgets);

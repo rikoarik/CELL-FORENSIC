@@ -62,13 +62,30 @@ on conflict (id) do update
 
 Self-serve dashboard sign-up is **not** exposed. New Auth users get `profiles.role = student` by default (`handle_new_user` trigger).
 
+### Demo credentials (pilot / lokal only)
+
+Akun guru demo sudah dipromosikan di project Supabase pilot. **Bukan untuk produksi** — ganti password / nonaktifkan sebelum go-live luas.
+
+| Field | Value |
+|---|---|
+| Email | `guru@cellforensic.demo` |
+| Password | `CellForensicDemo1!` |
+| Display name | Guru Demo |
+| Role | `profiles.role = teacher` |
+
+Password **tidak** di-hardcode di Flutter, APK, atau dart-define. Replay seed (SQL console / MCP `execute_sql`): `scripts/seed_demo_teacher.sql`.
+
+Setelah login: gunakan **Buat Sesi** untuk sesi yang bisa diaktifkan/ditutup. Seed `CELL01` tetap ada sebagai read-only (`teacher_id` null) — bukan milik akun demo.
+
 ## Dashboard usage
 
 ```bash
-flutter run -d chrome -t lib/main_dashboard.dart
+flutter run -d chrome -t lib/main_dashboard.dart \
+  --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+  --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
 ```
 
-1. Login with teacher email/password
+1. Login dengan demo credentials di atas (atau akun teacher lain)
 2. **Buat Sesi** — judul, join code, content version (`v1-demo`), durasi, status draft/aktif
 3. **Aktifkan** / **Tutup Sesi** — `status = active|closed`
 4. Siswa join dengan kode saat sesi **active**; menutup sesi mengunci write siswa (`group_in_active_session` / RPC)

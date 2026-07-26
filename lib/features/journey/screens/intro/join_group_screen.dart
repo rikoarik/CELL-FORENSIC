@@ -1,4 +1,3 @@
-import 'package:cell_forensic/core/supabase/supabase_config.dart';
 import 'package:cell_forensic/domain/entities.dart';
 import 'package:cell_forensic/features/journey/student_journey.dart';
 import 'package:cell_forensic/features/session/persisted_session_repository.dart';
@@ -299,8 +298,6 @@ class _JoinCodeStep extends StatelessWidget {
                   labelText: 'Kode gabung',
                 ),
               ),
-              const SizedBox(height: 12),
-              _BackendBadge(cloudReady: SupabaseConfig.isConfigured),
               if (error != null) ...[
                 const SizedBox(height: 16),
                 _ErrorBanner(message: error),
@@ -367,8 +364,6 @@ class _GroupSetupStep extends StatelessWidget {
                 'Sesi ${journey.joinCode ?? journey.content.joinCode}',
                 style: theme.textTheme.bodyLarge,
               ),
-              const SizedBox(height: 12),
-              _BackendBadge(cloudReady: SupabaseConfig.isConfigured),
               const SizedBox(height: 24),
               if (!hasGroup) ...[
                 Text('Nama Kelompok', style: theme.textTheme.titleLarge),
@@ -409,16 +404,6 @@ class _GroupSetupStep extends StatelessWidget {
                 ),
               ] else ...[
                 _GroupSummaryCard(group: group),
-                if (SupabaseConfig.isConfigured && !journey.isCloudSynced) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    'Kelompok tersimpan di perangkat. Sinkronisasi cloud belum '
-                    'berhasil — kamu tetap bisa lanjut offline.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
                 const SizedBox(height: 20),
                 Text('Anggota Kelompok', style: theme.textTheme.titleLarge),
                 const SizedBox(height: 8),
@@ -506,25 +491,6 @@ class _GroupSummaryCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _BackendBadge extends StatelessWidget {
-  const _BackendBadge({required this.cloudReady});
-
-  final bool cloudReady;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Text(
-      cloudReady
-          ? 'Backend Supabase aktif — kelompok akan dicatat ke sesi cloud bila tersedia.'
-          : 'Mode lokal — progres sesi/kelompok disimpan di perangkat ini.',
-      style: theme.textTheme.bodySmall?.copyWith(
-        color: theme.colorScheme.onSurfaceVariant,
       ),
     );
   }

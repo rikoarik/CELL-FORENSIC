@@ -1,3 +1,4 @@
+import 'package:cell_forensic/ar/ar_asset_registry.dart';
 import 'package:cell_forensic/ar/ar_scene_engine.dart';
 
 /// Misi 1–only visual helpers (PDF Scene 2 / SEQ-MISI-1).
@@ -6,9 +7,8 @@ import 'package:cell_forensic/ar/ar_scene_engine.dart';
 /// PDF beats with GLB swap + [ArOverlayEffect] because `ar_flutter_plugin_2`
 /// has no AR camera dolly, material glow, or animation clips.
 ///
-/// **Engine APIs desired (owned by ar-engine-agent, not called here yet):**
-/// - `smoothZoomToTarget` / `focusOnTarget` — true dolly through cell wall
-/// - native yellow material on chloroplast — today: Flutter yellow glow overlay
+/// Zoom uses [ArSceneEngine.smoothZoomToTarget] / [ArSceneEngine.focusOnTarget]
+/// so live path receives real [ArSceneVisualState.nodeScale] updates (Wave 5).
 abstract final class Misi1Visuals {
   /// PDF yellow chloroplast glow (overlay painters should use this).
   static const yellowGlow = ColorValue(0xFFFACC15);
@@ -23,31 +23,32 @@ abstract final class Misi1Visuals {
     await engine.setNodeScale(ArNodeIds.chloroplast, ArVec3.one);
     await engine.setNodeScale(ArNodeIds.vacuole, ArVec3.one);
     await engine.setNodePosition(ArNodeIds.primary, ArVec3.zero);
-    await engine.setMaterialHighlight(ArNodeIds.sampleA, enabled: true);
+    await engine.focusOnTarget(ArNodeIds.sampleA);
     await engine.setOpacity(1);
     await engine.showAnchoredOverlayEffect(ArOverlayEffect.none);
     // Registry maps this step → sampleA. Lab table path is never cleared here.
   }
 
-  /// Smooth zoom-through-wall approximation toward kloroplas + vakuola.
+  /// Smooth zoom-through-wall toward kloroplas + vakuola (same plane anchor).
   ///
-  /// Live AR: scale + slight lift on the **same** primary node (no re-anchor).
-  /// Fallback ModelViewer: pair with [ArAssetRegistry.cameraOrbitForStep].
-  /// True AR dolly needs engine `smoothZoomToTarget` (Wave 2 Engine API).
+  /// Live AR: [smoothZoomToTarget] updates primary [nodeScale] (synced by
+  /// mission panel). Fallback ModelViewer: [cameraOrbit] from registry.
   static Future<void> zoomInternal(ArSceneEngine engine) async {
     await engine.setSecondaryModel(null);
     await engine.showNode(ArNodeIds.primary);
     // Stay on Sample A AllInOne so both organelles remain in-frame (GAP-6).
-    await engine.setNodeScale(
+    await engine.setNodeScale(ArNodeIds.primary, ArVec3.one);
+    await engine.focusOnTarget(ArNodeIds.chloroplast);
+    await engine.smoothZoomToTarget(
       ArNodeIds.primary,
-      const ArVec3(1.55, 1.55, 1.55),
+      factor: 1.55,
+      cameraOrbit: ArAssetRegistry.cameraOrbitForStep('zoom_internal'),
     );
     // Slight rise = “through wall” framing without leaving the tabletop.
     await engine.setNodePosition(
       ArNodeIds.primary,
       const ArVec3(0, 0.04, 0),
     );
-    await engine.setMaterialHighlight(ArNodeIds.chloroplast, enabled: true);
     await engine.setNodeScale(
       ArNodeIds.chloroplast,
       const ArVec3(0.92, 0.92, 0.92),
@@ -67,7 +68,7 @@ abstract final class Misi1Visuals {
   /// [yellowGlow] (Wave 2 Overlays). Native material glow is unavailable.
   static Future<void> glowOrganelles(ArSceneEngine engine) async {
     await engine.setSecondaryModel(null);
-    await engine.setMaterialHighlight(ArNodeIds.chloroplast, enabled: true);
+    await engine.focusOnTarget(ArNodeIds.chloroplast);
     await engine.setNodeScale(
       ArNodeIds.chloroplast,
       const ArVec3(0.72, 0.72, 0.72),
@@ -89,7 +90,7 @@ abstract final class Misi1Visuals {
   /// Deflated giant vacuole (VakolaMain_Solo) — end of SEQ-MISI-1 (no M2).
   static Future<void> playShrinkAnimation(ArSceneEngine engine) async {
     await engine.setSecondaryModel(null);
-    await engine.setMaterialHighlight(ArNodeIds.vacuole, enabled: true);
+    await engine.focusOnTarget(ArNodeIds.vacuole);
     await engine.setNodeScale(
       ArNodeIds.vacuole,
       const ArVec3(0.55, 0.55, 0.55),

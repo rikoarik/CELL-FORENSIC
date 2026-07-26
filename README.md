@@ -8,12 +8,19 @@ Aplikasi pembelajaran AR berbasis kelompok (Flutter): investigasi sel, asisten A
 flutter pub get
 dart analyze
 
-# Siswa (Android / emulator)
+# Siswa — Android (ARCore) / iOS (ARKit) / emulator
 flutter run -t lib/main_mobile.dart
 
-# Dashboard guru (Chrome) — butuh akun teacher (lihat E9)
+# Siswa — Chrome (Mode 3D; AR kamera di Android/iOS native)
+flutter run -d chrome -t lib/main.dart
+
+# Dashboard guru — Chrome (login teacher)
 flutter run -d chrome -t lib/main_dashboard.dart
 ```
+
+`flutter run -d chrome` tanpa `-t` memakai `lib/main.dart` → **siswa**, bukan dashboard guru.
+
+Demo teacher (pilot only): email `guru@cellforensic.demo` — password & langkah login di [`docs/E9_TEACHER_AUTH.md`](docs/E9_TEACHER_AUTH.md) → **Demo credentials**.
 
 Supabase opsional lewat dart-define (**anon/publishable saja** — jangan `service_role`):
 

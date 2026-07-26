@@ -151,10 +151,15 @@ class _ArOverlayPainter extends CustomPainter {
         break;
     }
 
-    // Tap-organelle highlight (UI stand-in for mesh pick) — yellow kloroplas.
+    // Tap-organelle highlight (UI stand-in for mesh pick).
     if (highlightTarget == ArNodeIds.chloroplast &&
         effect != ArOverlayEffect.chloroplastHighlight) {
       paintChloroplastGlow(canvas, frame);
+    }
+
+    if (highlightTarget == ArNodeIds.vacuole &&
+        effect != ArOverlayEffect.vacuoleDamage) {
+      paintVacuoleDamage(canvas, frame);
     }
 
     if (highlightTarget == ArNodeIds.cellWall &&

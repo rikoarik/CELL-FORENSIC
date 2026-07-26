@@ -1,12 +1,12 @@
 {
-    "name": "cell_forensic",
-    "short_name": "cell_forensic",
+    "name": "Cell Forensic",
+    "short_name": "Cell Forensic",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#102A43",
+    "theme_color": "#102A43",
+    "description": "Cell Forensic — praktikum siswa (web Mode 3D) dan dashboard guru. Jalankan dengan target Flutter yang sesuai.",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

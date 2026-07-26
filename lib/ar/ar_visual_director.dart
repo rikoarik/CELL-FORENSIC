@@ -51,6 +51,8 @@ class ArVisualDirector {
       case ('MISI-2', 'play_leak_particles'):
         // PDF: partikel air biru tua menyembur dari area membran (bukan fullscreen).
         await Misi2VisualHelpers.playMembraneLeakParticles(engine);
+      case ('MISI-3', 'show_damaged_sample_a'):
+        await Misi3Visuals.showDamagedSampleA(engine);
       case ('MISI-3', 'show_both_samples'):
         await Misi3Visuals.showBothSamples(engine);
       case ('MISI-3', 'highlight_cell_wall'):

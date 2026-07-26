@@ -110,7 +110,7 @@ ContentPack buildLocalContentPack() {
     missions: [
       MissionContent(
         code: 'MISI-1',
-        title: 'Misi 1 — Investigasi Internal Sampel A',
+        title: 'Misi 1 — Analisis',
         sampleRef: 'SAMPLE_A',
         orderNumber: 1,
         briefing:
@@ -155,7 +155,7 @@ ContentPack buildLocalContentPack() {
       ),
       MissionContent(
         code: 'MISI-2',
-        title: 'Misi 2 — Membran Sampel B',
+        title: 'Misi 2 — Analisis',
         sampleRef: 'SAMPLE_B',
         orderNumber: 2,
         briefing:
@@ -201,7 +201,7 @@ ContentPack buildLocalContentPack() {
       ),
       MissionContent(
         code: 'MISI-3',
-        title: 'Misi 3 — Perbandingan Lapisan Terluar',
+        title: 'Misi 3 — Menyelidiki perbedaan & Implikasinya',
         sampleRef: 'SAMPLE_AB',
         orderNumber: 3,
         briefing:

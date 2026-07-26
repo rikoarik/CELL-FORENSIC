@@ -20,20 +20,29 @@ class GroupDetailScreen extends StatefulWidget {
   final LearningSession session;
   final Group group;
 
-  /// False for unowned demo / other-teacher sessions (E9 RLS).
+  /// False for unowned / other-teacher sessions (E9 RLS).
   final bool canManage;
 
   @override
   State<GroupDetailScreen> createState() => _GroupDetailScreenState();
 }
 
-class _GroupDetailScreenState extends State<GroupDetailScreen> {
+class _GroupDetailScreenState extends State<GroupDetailScreen>
+    with SingleTickerProviderStateMixin {
   late Future<DashboardGroupDetail> _future;
+  late final TabController _tabController;
 
   @override
   void initState() {
     super.initState();
     _future = _load();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<DashboardGroupDetail> _load() {
@@ -97,6 +106,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         : widget.session.title;
 
     return Scaffold(
+      backgroundColor: DesignTokens.surface,
       appBar: AppBar(
         title: Text(widget.group.name),
         actions: [
@@ -125,99 +135,296 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           final detail = snapshot.data!;
           return RefreshIndicator(
             onRefresh: _reload,
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(DesignTokens.spaceLg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    sessionTitle,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Kode sesi: ${widget.session.joinCode}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: DesignTokens.spaceLg),
-                  _SectionCard(
-                    title: 'Anggota (${detail.group.members.length})',
-                    child: detail.group.members.isEmpty
-                        ? const Text('Belum ada anggota.')
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              for (final m in detail.group.members)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 6),
-                                  child: Text(
-                                    '${m.isLeader ? '★ ' : '• '}${m.displayName}'
-                                    '${m.isLeader ? ' (ketua)' : ''}',
-                                  ),
-                                ),
-                            ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final wide =
+                    constraints.maxWidth >= DesignTokens.dashboardBreakpoint;
+                if (wide) {
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(
+                        width: 340,
+                        child: ColoredBox(
+                          color: Colors.white,
+                          child: SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.all(DesignTokens.spaceLg),
+                            child: _SummaryRail(
+                              sessionTitle: sessionTitle,
+                              joinCode: widget.session.joinCode,
+                              detail: detail,
+                            ),
                           ),
-                  ),
-                  const SizedBox(height: DesignTokens.spaceMd),
-                  _SectionCard(
-                    title: 'Progres misi',
-                    child: detail.missionProgress.isEmpty
-                        ? const Text('Belum ada progres misi.')
-                        : Column(
-                            children: [
-                              for (final p in detail.missionProgress)
-                                ListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  dense: true,
-                                  title: Text(
-                                    '${p.missionCode} — ${p.missionTitle}',
-                                  ),
-                                  subtitle: Text(
-                                    'Status: ${_statusLabel(p.status)} · Mode: ${p.arMode}',
-                                  ),
-                                ),
-                            ],
-                          ),
-                  ),
-                  const SizedBox(height: DesignTokens.spaceMd),
-                  _SectionCard(
-                    title: 'Kesimpulan investigasi',
-                    child: detail.conclusion == null
-                        ? const Text('Belum ada draft kesimpulan.')
-                        : _ConclusionBody(conclusion: detail.conclusion!),
-                  ),
-                  const SizedBox(height: DesignTokens.spaceMd),
-                  Text(
-                    'Jawaban & penilaian',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: DesignTokens.spaceSm),
-                  Text(
-                    detail.pendingReviewCount == 0
-                        ? 'Semua jawaban yang membutuhkan review sudah dinilai '
-                            '(atau belum ada jawaban esai).'
-                        : '${detail.pendingReviewCount} jawaban menunggu review guru.',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  if (!widget.canManage) ...[
-                    const SizedBox(height: DesignTokens.spaceSm),
-                    Text(
-                      'Mode baca saja — sesi ini tidak dapat Anda nilai.',
-                      key: const Key('group-detail-readonly'),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
+                        ),
+                      ),
+                      const VerticalDivider(width: 1),
+                      Expanded(child: _buildTabsPane(detail)),
+                    ],
+                  );
+                }
+                return CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.all(DesignTokens.spaceLg),
+                      sliver: SliverToBoxAdapter(
+                        child: _SummaryRail(
+                          sessionTitle: sessionTitle,
+                          joinCode: widget.session.joinCode,
+                          detail: detail,
+                        ),
+                      ),
+                    ),
+                    SliverFillRemaining(
+                      hasScrollBody: true,
+                      child: _buildTabsPane(detail),
                     ),
                   ],
-                  const SizedBox(height: DesignTokens.spaceMd),
-                  ..._answerCards(detail),
-                ],
-              ),
+                );
+              },
             ),
           );
         },
       ),
+    );
+  }
+
+  Widget _buildTabsPane(DashboardGroupDetail detail) {
+    return ColoredBox(
+      color: DesignTokens.surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Material(
+            color: Colors.white,
+            child: TabBar(
+              controller: _tabController,
+              labelColor: DesignTokens.navy,
+              unselectedLabelColor: DesignTokens.inkMuted,
+              indicatorColor: DesignTokens.blue,
+              tabs: [
+                Tab(
+                  key: const Key('group-detail-tab-penilaian'),
+                  text: detail.pendingReviewCount > 0
+                      ? 'Penilaian (${detail.pendingReviewCount})'
+                      : 'Penilaian',
+                ),
+                const Tab(
+                  key: Key('group-detail-tab-kesimpulan'),
+                  text: 'Kesimpulan',
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _PenilaianTab(
+                  detail: detail,
+                  canManage: widget.canManage,
+                  onReview: _openReview,
+                ),
+                _KesimpulanTab(detail: detail),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryRail extends StatelessWidget {
+  const _SummaryRail({
+    required this.sessionTitle,
+    required this.joinCode,
+    required this.detail,
+  });
+
+  final String sessionTitle;
+  final String joinCode;
+  final DashboardGroupDetail detail;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          sessionTitle,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: DesignTokens.navy,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: DesignTokens.navy,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              joinCode,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.1,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: DesignTokens.spaceLg),
+        _SectionCard(
+          title: 'Anggota (${detail.group.members.length})',
+          child: detail.group.members.isEmpty
+              ? const Text('Belum ada anggota.')
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final m in detail.group.members)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 14,
+                              backgroundColor:
+                                  DesignTokens.blue.withValues(alpha: 0.12),
+                              foregroundColor: DesignTokens.blue,
+                              child: Text(
+                                m.displayName.isEmpty
+                                    ? '?'
+                                    : m.displayName[0].toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                '${m.displayName}${m.isLeader ? ' (ketua)' : ''}',
+                              ),
+                            ),
+                            if (m.isLeader)
+                              const Icon(
+                                Icons.star_rounded,
+                                size: 18,
+                                color: Color(0xFFF0B429),
+                              ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+        const SizedBox(height: DesignTokens.spaceMd),
+        _SectionCard(
+          title: 'Progres misi',
+          child: detail.missionProgress.isEmpty
+              ? const Text('Belum ada progres misi.')
+              : Column(
+                  children: [
+                    for (final p in detail.missionProgress)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        leading: _MissionStatusDot(status: p.status),
+                        title: Text('${p.missionCode} — ${p.missionTitle}'),
+                        subtitle: Text(
+                          '${_statusLabel(p.status)} · Mode ${p.arMode}',
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+
+  static String _statusLabel(String status) {
+    switch (status) {
+      case 'completed':
+        return 'selesai';
+      case 'in_progress':
+        return 'berjalan';
+      case 'not_started':
+        return 'belum mulai';
+      default:
+        return status;
+    }
+  }
+}
+
+class _PenilaianTab extends StatelessWidget {
+  const _PenilaianTab({
+    required this.detail,
+    required this.canManage,
+    required this.onReview,
+  });
+
+  final DashboardGroupDetail detail;
+  final bool canManage;
+  final Future<void> Function(DashboardAnswerReview answer) onReview;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(DesignTokens.spaceLg),
+      children: [
+        if (detail.pendingReviewCount > 0)
+          Container(
+            margin: const EdgeInsets.only(bottom: DesignTokens.spaceMd),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF8E6),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE8C56A)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.rate_review_outlined, color: Color(0xFF8A6A00)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '${detail.pendingReviewCount} jawaban menunggu review guru.',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF5C4A00),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.only(bottom: DesignTokens.spaceMd),
+            child: Text(
+              'Semua jawaban yang membutuhkan review sudah dinilai '
+              '(atau belum ada jawaban esai).',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+        if (!canManage) ...[
+          Text(
+            'Mode baca saja — sesi ini tidak dapat Anda nilai.',
+            key: const Key('group-detail-readonly'),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+          ),
+          const SizedBox(height: DesignTokens.spaceMd),
+        ],
+        ..._answerCards(detail),
+      ],
     );
   }
 
@@ -240,24 +447,32 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           padding: const EdgeInsets.only(bottom: DesignTokens.spaceMd),
           child: _AnswerCard(
             answer: answer,
-            canManage: widget.canManage,
-            onReview: () => _openReview(answer),
+            canManage: canManage,
+            onReview: () => onReview(answer),
           ),
         ),
     ];
   }
+}
 
-  static String _statusLabel(String status) {
-    switch (status) {
-      case 'completed':
-        return 'selesai';
-      case 'in_progress':
-        return 'berjalan';
-      case 'not_started':
-        return 'belum mulai';
-      default:
-        return status;
-    }
+class _KesimpulanTab extends StatelessWidget {
+  const _KesimpulanTab({required this.detail});
+
+  final DashboardGroupDetail detail;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(DesignTokens.spaceLg),
+      children: [
+        _SectionCard(
+          title: 'Kesimpulan investigasi',
+          child: detail.conclusion == null
+              ? const Text('Belum ada draft kesimpulan.')
+              : _ConclusionBody(conclusion: detail.conclusion!),
+        ),
+      ],
+    );
   }
 }
 
@@ -271,19 +486,104 @@ class _ConclusionBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          conclusion.isSubmitted ? 'Status: terkirim' : 'Status: draf',
-          style: const TextStyle(fontWeight: FontWeight.w600),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: conclusion.isSubmitted
+                ? const Color(0xFFE3F8E8)
+                : const Color(0xFFEFF3F6),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            conclusion.isSubmitted ? 'Terkirim' : 'Draf',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+              color: conclusion.isSubmitted
+                  ? const Color(0xFF0E7A3D)
+                  : DesignTokens.inkMuted,
+            ),
+          ),
         ),
-        const SizedBox(height: 8),
-        Text('Sampel A: ${conclusion.sampleAIdentity}'),
-        Text(conclusion.sampleAReasoning),
-        const SizedBox(height: 8),
-        Text('Sampel B: ${conclusion.sampleBIdentity}'),
-        Text(conclusion.sampleBReasoning),
-        const SizedBox(height: 8),
-        Text('Hipotesis: ${conclusion.groupHypothesis}'),
+        const SizedBox(height: 12),
+        _ConclusionField(
+          label: 'Sampel A',
+          value: conclusion.sampleAIdentity,
+          detail: conclusion.sampleAReasoning,
+        ),
+        const SizedBox(height: 10),
+        _ConclusionField(
+          label: 'Sampel B',
+          value: conclusion.sampleBIdentity,
+          detail: conclusion.sampleBReasoning,
+        ),
+        const SizedBox(height: 10),
+        _ConclusionField(
+          label: 'Hipotesis kelompok',
+          value: conclusion.groupHypothesis,
+        ),
       ],
+    );
+  }
+}
+
+class _ConclusionField extends StatelessWidget {
+  const _ConclusionField({
+    required this.label,
+    required this.value,
+    this.detail,
+  });
+
+  final String label;
+  final String value;
+  final String? detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final empty = value.trim().isEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: DesignTokens.inkMuted,
+              ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          empty ? '—' : value,
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        if (detail != null && detail!.trim().isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(detail!, style: Theme.of(context).textTheme.bodyMedium),
+        ],
+      ],
+    );
+  }
+}
+
+class _MissionStatusDot extends StatelessWidget {
+  const _MissionStatusDot({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (status) {
+      'completed' => const Color(0xFF0E7A3D),
+      'in_progress' => DesignTokens.blue,
+      'not_started' => DesignTokens.border,
+      _ => DesignTokens.inkMuted,
+    };
+    return Container(
+      width: 12,
+      height: 12,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+      ),
     );
   }
 }
@@ -529,7 +829,8 @@ class _ReviewSheetState extends State<_ReviewSheet> {
             TextField(
               key: const Key('teacher-score-field'),
               controller: _scoreController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
               ],
@@ -550,7 +851,10 @@ class _ReviewSheetState extends State<_ReviewSheet> {
             ),
             if (_error != null) ...[
               const SizedBox(height: 8),
-              Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
             ],
             const SizedBox(height: 16),
             FilledButton(

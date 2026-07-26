@@ -1,3 +1,4 @@
+import 'package:cell_forensic/ar/ar_capability_probe.dart';
 import 'package:cell_forensic/features/content/local_content_pack.dart';
 import 'package:cell_forensic/features/journey/screens/intro/device_check_screen.dart';
 import 'package:cell_forensic/features/journey/student_journey.dart';
@@ -8,42 +9,207 @@ StudentJourney _journey() => StudentJourney(content: buildLocalContentPack());
 
 Widget _wrap(Widget child) => MaterialApp(home: child);
 
-void main() {
-  testWidgets('shows AR support explanation and both mode buttons', (
-    tester,
-  ) async {
-    final journey = _journey();
-    await tester.pumpWidget(_wrap(DeviceCheckScreen(journey: journey)));
+ArCapabilityProbe _probe(ArCapabilityResult result) =>
+    ArCapabilityProbe(debugOverride: () async => result);
 
-    expect(find.text('AR Didukung'), findsOneWidget);
-    expect(find.text('Gunakan Mode 3D'), findsOneWidget);
-    // Some explanation about AR support is present.
-    expect(find.textContaining('AR'), findsWidgets);
+void main() {
+  tearDown(() {
+    ArCapabilityProbe.debugProbeOverride = null;
   });
 
-  testWidgets('AR Didukung completes device check as AR supported', (
+  testWidgets('shows loading then AR continue when probe supports AR', (
     tester,
   ) async {
     final journey = _journey();
-    await tester.pumpWidget(_wrap(DeviceCheckScreen(journey: journey)));
+    await tester.pumpWidget(
+      _wrap(
+        DeviceCheckScreen(
+          journey: journey,
+          probe: _probe(
+            const ArCapabilityResult(
+              supported: true,
+              reason: 'arcore_supported',
+              platform: 'android',
+              arcoreAvailability: 'SUPPORTED_INSTALLED',
+              cameraGranted: true,
+            ),
+          ),
+        ),
+      ),
+    );
 
-    await tester.tap(find.text('AR Didukung'));
+    expect(find.byKey(const Key('device-check-loading')), findsOneWidget);
+    await tester.pump(); // post-frame probe start
+    await tester.pump(); // probe completes
+
+    expect(find.byKey(const Key('device-check-continue-ar')), findsOneWidget);
+    expect(find.text('Gunakan Mode 3D'), findsNothing);
+    expect(find.textContaining('AR siap'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('device-check-continue-ar')));
     await tester.pump();
 
     expect(journey.stage, JourneyStage.joinSession);
     expect(journey.arSupported, isTrue);
   });
 
-  testWidgets('Gunakan Mode 3D completes device check without AR', (
+  testWidgets('offers Mode 3D only when probe reports unsupported', (
     tester,
   ) async {
     final journey = _journey();
-    await tester.pumpWidget(_wrap(DeviceCheckScreen(journey: journey)));
+    await tester.pumpWidget(
+      _wrap(
+        DeviceCheckScreen(
+          journey: journey,
+          probe: _probe(
+            const ArCapabilityResult(
+              supported: false,
+              reason: 'arcore_unsupported_device',
+              platform: 'android',
+              arcoreAvailability: 'UNSUPPORTED_DEVICE_NOT_CAPABLE',
+              cameraGranted: true,
+            ),
+          ),
+        ),
+      ),
+    );
 
-    await tester.tap(find.text('Gunakan Mode 3D'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const Key('device-check-continue-3d')), findsOneWidget);
+    expect(find.byKey(const Key('device-check-continue-ar')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('device-check-continue-3d')));
     await tester.pump();
 
     expect(journey.stage, JourneyStage.joinSession);
     expect(journey.arSupported, isFalse);
+  });
+
+  testWidgets('retry re-runs probe after camera denial', (tester) async {
+    var calls = 0;
+    final journey = _journey();
+    final probe = ArCapabilityProbe(
+      debugOverride: () async {
+        calls++;
+        if (calls == 1) {
+          return const ArCapabilityResult(
+            supported: false,
+            reason: 'camera_permission_denied',
+            platform: 'android',
+            cameraGranted: false,
+          );
+        }
+        return const ArCapabilityResult(
+          supported: true,
+          reason: 'arcore_supported',
+          platform: 'android',
+          arcoreAvailability: 'SUPPORTED_INSTALLED',
+          cameraGranted: true,
+        );
+      },
+    );
+
+    await tester.pumpWidget(
+      _wrap(DeviceCheckScreen(journey: journey, probe: probe)),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.textContaining('izin kamera'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('device-check-retry')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(calls, 2);
+    expect(find.byKey(const Key('device-check-continue-ar')), findsOneWidget);
+  });
+
+  testWidgets('platform unsupported menawarkan Mode 3D dengan copy browser', (
+    tester,
+  ) async {
+    final journey = _journey();
+    await tester.pumpWidget(
+      _wrap(
+        DeviceCheckScreen(
+          journey: journey,
+          probe: _probe(ArCapabilityProbe.unsupportedDesktop),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const Key('device-check-continue-3d')), findsOneWidget);
+    expect(
+      find.textContaining('Browser / desktop tidak menjalankan AR'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('device-check-continue-3d')));
+    await tester.pump();
+
+    expect(journey.arSupported, isFalse);
+    expect(journey.stage, JourneyStage.joinSession);
+  });
+
+  testWidgets('arkit_supported offers Lanjut Mode AR', (tester) async {
+    final journey = _journey();
+    await tester.pumpWidget(
+      _wrap(
+        DeviceCheckScreen(
+          journey: journey,
+          probe: _probe(
+            const ArCapabilityResult(
+              supported: true,
+              reason: 'arkit_supported',
+              platform: 'iOS',
+              arcoreAvailability: 'ARKIT_WORLD_TRACKING_SUPPORTED',
+              cameraGranted: true,
+              hasCameraArFeature: true,
+              probed: true,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Lanjut Mode AR'), findsOneWidget);
+    expect(find.byKey(const Key('device-check-continue-ar')), findsOneWidget);
+    expect(find.text('Gunakan Mode 3D'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('device-check-continue-ar')));
+    await tester.pump();
+
+    expect(journey.arSupported, isTrue);
+    expect(journey.stage, JourneyStage.joinSession);
+  });
+
+  testWidgets('arkit_unsupported_device offers Mode 3D', (tester) async {
+    final journey = _journey();
+    await tester.pumpWidget(
+      _wrap(
+        DeviceCheckScreen(
+          journey: journey,
+          probe: _probe(
+            const ArCapabilityResult(
+              supported: false,
+              reason: 'arkit_unsupported_device',
+              platform: 'iOS',
+              probed: true,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Gunakan Mode 3D'), findsOneWidget);
+    expect(find.text('Lanjut Mode AR'), findsNothing);
+    expect(find.textContaining('tidak mendukung ARKit'), findsOneWidget);
   });
 }

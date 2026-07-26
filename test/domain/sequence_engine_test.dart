@@ -79,6 +79,7 @@ void main() {
     expect(
       m3!.config.steps.map((s) => s.code).toList(),
       [
+        SequenceStepCodes.showDamagedSampleA,
         SequenceStepCodes.showBothSamples,
         SequenceStepCodes.highlightCellWall,
         SequenceStepCodes.markSampleB,

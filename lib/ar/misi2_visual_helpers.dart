@@ -32,7 +32,7 @@ abstract final class Misi2VisualHelpers {
     await engine.replaceModelAtActiveAnchor(ArAssetRegistry.sampleB);
     await engine.setNodeScale(ArNodeIds.primary, outerFocusScale);
     await engine.setNodeScale(ArNodeIds.membrane, const ArVec3(1.1, 1.1, 1.1));
-    await engine.setMaterialHighlight(ArNodeIds.membrane, enabled: true);
+    await engine.focusOnTarget(ArNodeIds.membrane);
     await engine.setOpacity(1);
     await engine.showAnchoredOverlayEffect(ArOverlayEffect.none);
   }
@@ -41,13 +41,20 @@ abstract final class Misi2VisualHelpers {
   ///
   /// Damage overlay is deferred to [showTornBilayer] so students see normal
   /// then torn, matching the PDF “diperbesar … lalu … robek” beat order.
+  /// Uses [smoothZoomToTarget] so live AR receives real [nodeScale] updates.
   static Future<void> zoomIntactBilayer(ArSceneEngine engine) async {
     await stayOnTabletop(engine);
     await engine.setSecondaryModel(null);
     await engine.replaceModelAtActiveAnchor(ArAssetRegistry.sampleB);
-    await engine.setNodeScale(ArNodeIds.primary, bilayerZoomScale);
+    // Reset zoom baseline so factor maps to [bilayerZoomScale] exactly.
+    await engine.setNodeScale(ArNodeIds.primary, ArVec3.one);
+    await engine.focusOnTarget(ArNodeIds.membrane);
+    await engine.smoothZoomToTarget(
+      ArNodeIds.primary,
+      factor: bilayerZoomScale.x,
+      cameraOrbit: ArAssetRegistry.cameraOrbitForStep('zoom_membrane'),
+    );
     await engine.setNodeScale(ArNodeIds.membrane, const ArVec3(1.25, 1.25, 1.25));
-    await engine.setMaterialHighlight(ArNodeIds.membrane, enabled: true);
     await engine.setOpacity(1);
     await engine.showAnchoredOverlayEffect(ArOverlayEffect.none);
   }

@@ -69,6 +69,9 @@ class StudentJourney extends ChangeNotifier {
   /// Completed logbook entries keyed by mission code.
   final Map<String, Map<String, String>> logbookByMission = {};
 
+  /// Sample A organelle observation ids (not mission completion).
+  final Set<String> inspectedOrganelleHotspots = {};
+
   /// Autosaved conclusion draft (E4-06).
   ConclusionDraft? conclusionDraft;
 
@@ -175,6 +178,37 @@ class StudentJourney extends ChangeNotifier {
   void completeDeviceCheck({required bool arSupported}) {
     _arSupported = arSupported;
     _transition(JourneyStage.joinSession);
+  }
+
+  /// Whether the progress-bar Back control should show.
+  bool get canGoBack => _stage != JourneyStage.deviceCheck;
+
+  /// Soft step back one journey stage (does not erase mission/logbook data).
+  void goBack() {
+    final prev = switch (_stage) {
+      JourneyStage.deviceCheck => null,
+      JourneyStage.joinSession => JourneyStage.deviceCheck,
+      JourneyStage.groupSetup => JourneyStage.joinSession,
+      // Live UI skips onboarding → investigating; step back to group setup.
+      JourneyStage.onboarding => JourneyStage.groupSetup,
+      JourneyStage.investigating => JourneyStage.groupSetup,
+      JourneyStage.conclusion => JourneyStage.investigating,
+      JourneyStage.stations => JourneyStage.conclusion,
+      JourneyStage.results => JourneyStage.stations,
+    };
+    if (prev == null) return;
+    _transition(prev);
+  }
+
+  /// Upgrades a Mode 3D session to live AR without resetting join/group state.
+  ///
+  /// Clears [labPlaced] so Scene 1 re-runs plane scan on the camera path.
+  /// No-op when already on live AR.
+  void enableLiveAr() {
+    if (_arSupported) return;
+    _arSupported = true;
+    _labPlaced = false;
+    notifyListeners();
   }
 
   /// Records a successful join by code (local and/or remote). Advances to
@@ -323,6 +357,9 @@ class StudentJourney extends ChangeNotifier {
       ..addAll({
         for (final e in snapshot.logbookByMission.entries) e.key: Map.of(e.value),
       });
+    inspectedOrganelleHotspots
+      ..clear()
+      ..addAll(snapshot.inspectedOrganelleHotspots);
     conclusionDraft = snapshot.conclusionDraft;
 
     final maxStation =
@@ -436,6 +473,9 @@ class StudentJourney extends ChangeNotifier {
       logbookByMission: {
         for (final e in logbookByMission.entries) e.key: Map.of(e.value),
       },
+      inspectedOrganelleHotspots: inspectedOrganelleHotspots.toList(
+        growable: false,
+      ),
       conclusionDraft: conclusionDraft,
       stationIndex: _stationIndex,
       activeStationUnlocked: _activeStationUnlocked,
@@ -547,6 +587,14 @@ class StudentJourney extends ChangeNotifier {
   void saveLogbook(Map<String, String> entries) {
     logbookByMission[activeMission.code] = Map.of(entries);
     _sync.enqueueLogbook(journey: this, entries: entries);
+    notifyListeners();
+  }
+
+  /// Persists Sample A organelle inspection (observation only — not mission done).
+  void saveInspectedOrganelleHotspots(Iterable<String> ids) {
+    inspectedOrganelleHotspots
+      ..clear()
+      ..addAll(ids);
     notifyListeners();
   }
 

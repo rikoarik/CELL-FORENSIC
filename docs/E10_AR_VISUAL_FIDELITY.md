@@ -381,3 +381,401 @@ MISI-3  show_both_samples     → live tabletop AR
 ### Merged commits on `main`
 
 `d8e1f9f` engine → `4fbe412` overlays → `e02d697` M1 → `7a899a9` M2 → `a782aaf` M3 (+ Wave 3 merge commits)
+
+---
+
+## Wave 4 — Tests
+
+**Owner:** ar-test-agent  
+**Date:** 2026-07-26  
+**Scope:** Mandatory AR fidelity cases after Wave 3 merge. Prefer `test/ar/` + `FakeArSceneEngine`; no group/session/LKPD flow changes.  
+**Primary suite:** `test/ar/wave4_ar_fidelity_test.dart` (W4-01…W4-14)  
+**Related suites:** `ar_scene_engine_test.dart`, `ar_visual_director_test.dart`, `mission_scene_persistence_test.dart`, `ar_lifecycle_controller_test.dart`, `ar_scene_overlays_test.dart`, `test/domain/sequence_engine_test.dart`
+
+### Command
+
+```bash
+flutter test test/ar/ test/domain/sequence_engine_test.dart
+```
+
+**Result (2026-07-26):** `+50` — all passed (14 Wave 4 cases + related AR/sequence coverage).
+
+### Pass/fail matrix — 14 mandatory cases
+
+| # | Case | Result | Primary evidence |
+|---|---|---|---|
+| 1 | Live AR success does not enter fallback | **Pass** | `W4-01`; also `mission_scene_persistence_test` — Mode AR, no fallback banner after place |
+| 2 | Fallback on unsupported / init failure | **Pass** | `W4-02` — force-fallback → Mode 3D + banner; Fake `isFallback` |
+| 3 | Same anchor across steps | **Pass** | `W4-03` — placement + `labTableModelPath` stable across M1/M2/M3 |
+| 4 | Misi 1 sequence only runs M1 visuals | **Pass** | `W4-04` — M1 steps/overlays only; no M2 leak / M3 force arrows |
+| 5 | Misi 2 only M2 | **Pass** | `W4-05` — membrane highlight + M2 overlays only |
+| 6 | Misi 3 only M3 | **Pass** | `W4-06` — A+B secondary + M3 overlays; not mitokondria |
+| 7 | Re-trigger does not duplicate completion | **Pass** | `W4-07` — `completeCurrentStep` same state; action id dedupe |
+| 8 | Unknown `sequenceCode` does not change scene | **Pass** | `W4-08` — `startForSequenceCode` null; unknown step no visual change |
+| 9 | Tracking lost pauses sequence | **Pass** | `W4-09` — queued `runAction`; step index unchanged |
+| 10 | Lifecycle pause does not advance sequence | **Pass** | `W4-10` — Jalankan Langkah disabled; step index held |
+| 11 | Resume continues same step | **Pass** | `W4-11` — index 1 retained through pause → relocalize → zoom |
+| 12 | M3 side-by-side stays tabletop | **Pass** | `W4-12` — secondary B + `sideBySideOffsetX` + lab table |
+| 13 | M2 particles bound to membrane target | **Pass** | `W4-13` — `waterLeak` + `highlightTarget=membrane` |
+| 14 | `model_viewer_plus` not used on healthy ARCore | **Pass** | `W4-14` — Live engine, Mode AR, `ModelViewer` findsNothing |
+
+**Score:** 14 / 14 Pass. Production seams untouched (tests only).
+
+---
+
+## Wave 4 — Review
+
+**Role:** ar-review-agent (final gate)  
+**Date:** 2026-07-26  
+**SoT:** `CELL FORENSIC (3).pdf` Scene 2 (Misi 1–3) + this document  
+**Code reviewed:** `ar_visual_director.dart`, `misi1_visuals.dart`, `misi2_visual_helpers.dart`, `misi3_visuals.dart`, `ar_overlay_painters.dart` / `ar_scene_overlays.dart`, `ar_scene_engine.dart`, `mission_scene_panel.dart`, `sequence_engine.dart` (+ `mission_screen.dart` intent wiring)
+
+### Gate verdict
+
+**FAIL** *(historical — superseded by [Wave 5 — Re-gate](#wave-5--re-gate) = **PASS_WITH_GAPS**)*
+
+Director + overlay choreography matches PDF intent on paper and in unit tests, but two **Critical** live-path bugs prevent PDF visual beats from actually appearing on the supported camera AR path / intent-triggered playback. Do not ship Wave 4 as fidelity-complete.
+
+### PDF beat scorecard
+
+| Beat (PDF SoT) | Result | Severity if gap | Evidence |
+|---|---|---|---|
+| **M1** Smooth zoom-in through cell wall (Sampel A) | **FAIL** | Critical | `Misi1Visuals.zoomInternal` sets `nodeScale` 1.55 + Y lift, but `mission_scene_panel._applyUserTransformToNodes` / `_createNodeForAsset` use only `_baseScale * _gestureScale` — **sequence `nodeScale` never applied to live AR nodes**. Fallback ModelViewer orbit works; live camera path does not. Directors also never call `smoothZoomToTarget` (API exists). |
+| **M1** Yellow glow on shrinking chloroplast | **PASS** | — | `chloroplastHighlight` paints `#FACC15`; registry → `kloroplasSolo`; scale 0.72 stored (mesh scale unused on live — see Critical above; GLB swap + yellow overlay still convey beat). |
+| **M1** Deflated giant vacuole | **PASS*** | Important* | `vakuolaMainSolo` + `vacuoleDamage` + opacity 0.82. *No animation clip (plugin E0); shrink scale not applied to live mesh. Acceptable stub if GLB+overlay remain. |
+| **M1** Tabletop / same plane anchor retained | **PASS** | — | Placement preserved across M1 steps (tests + `labTable` never cleared). |
+| **M2** Zoom to outer membrane / intact bilayer | **FAIL** | Critical | Same live `nodeScale` ignore — `bilayerZoomScale` 1.35 is state-only on camera path. Intact-before-torn order is correct in director. |
+| **M2** Torn phospholipid bilayer | **PASS_WITH_GAPS** | Important | `RantaiProtein` proxy + `membraneDamage` ring. Dedicated torn-bilayer GLB still missing (E0). |
+| **M2** Dark-blue water from membrane (not fullscreen) | **PASS** | — | `waterLeak` + `#1E3A8A` rim spray from primary center; `highlightTarget=membrane`; not fullscreen scatter. Native particles still unavailable (documented stub). |
+| **M3** Side-by-side A+B | **PASS** | — | `setSecondaryModel` + `comparisonLabels`; matched scale. |
+| **M3** Green cell-wall contour on A | **PASS** | — | `cellWallHighlight` green double contour `#22C55E` + `dindingSelSolo`. |
+| **M3** Red X on B (no wall) | **PASS** | — | `missingStructureCross` on Sample B when dual. |
+| **M3** Force arrows on dinding (not mitokondria) | **PASS** | — | Registry + `Misi3Visuals.showForceArrows` → `dindingSelSolo`; tests assert ≠ `mitokondriaSolo`. |
+| **No auto-advance missions** | **PASS** | — | `SequenceEngine` / `MissionSequences` do not chain M1→M2→M3; missions start via intent (`startMissionFromIntent`). |
+| **Intent-driven; fallback only when needed** | **FAIL** (intent timing) / **PASS** (fallback policy) | Critical (timing) | Intent `_playSequenceFromCode` **instant-while-loops all steps** → only last frame remains visible (violates PDF “otomatis” progressive animation). Soft ModelViewer fallback only when `!arSupported` or fatal live init **before** place — healthy place stays on `ARView` (**PASS**). |
+
+\*PASS with known plugin approximation.
+
+### Summary counts
+
+| PASS | PASS_WITH_GAPS | FAIL |
+|---|---|---|
+| 8 | 1 (torn bilayer proxy) | 3 (M1 live zoom, M2 live zoom, intent beat timing) |
+
+### Remaining gaps by severity
+
+#### Critical (must fix in Wave 5 — blocks gate)
+
+1. **Apply sequence `nodeScale` (and zoom APIs) on live AR nodes**  
+   In `mission_scene_panel.dart` `_applyUserTransformToNodes` / `_createNodeForAsset`, multiply `_baseScale * _gestureScale * visual.nodeScale[primary|sampleA|sampleB]` (and position already wired). Without this, PDF zoom-through-wall and membrane zoom are invisible on the camera path.
+
+2. **Intent sequence must dwell per PDF beat**  
+   `mission_screen._playSequenceFromCode` must not collapse SEQ-MISI-1/2/3 into a synchronous while-loop. Play step → apply visuals → await dwell/animation budget (or drive via `Jalankan Langkah` / timed queue) so zoom → glow/torn → particles are each visible. Still no cross-mission auto-advance.
+
+#### Important (Wave 5 fidelity — after Critical)
+
+3. Wire `Misi1Visuals.zoomInternal` / `Misi2VisualHelpers.zoomIntactBilayer` through `smoothZoomToTarget` + `focusOnTarget` (fallback `cameraOrbit` already in registry).  
+4. Dedicated torn-bilayer GLB (replace `RantaiProtein` proxy) when asset available.  
+5. Optional: green “wall resistance” cue on force-arrows overlay (Wave 2 M3 doc claimed it; painter is amber inward + red on B only).  
+6. Re-apply current step visuals on tracking recovery (Wave 1 Interaction #2 — still open).  
+7. Organelle sub-node scales remain logical-only — document or approximate shrink via primary scale / overlay only until plugin supports submeshes.
+
+#### Non-blocking / accepted stubs
+
+- Native particle emitter unavailable → membrane-anchored Flutter `waterLeak` OK.  
+- Native material glow unavailable → yellow overlay OK.  
+- No GLB animation clips → vacuole “deflate” via swap + rings OK for Wave 5 unless clips land.
+
+### Required Wave 5 fix list (ordered)
+
+1. Live node transform: honor `visual.nodeScale` (+ keep user gesture scale separate).  
+2. Timed / stepped intent playback for SEQ-MISI-1/2/3 (no instant full-sequence collapse).  
+3. Directors call `smoothZoomToTarget` / `focusOnTarget` for M1 zoom + M2 membrane zoom.  
+4. Asset: torn bilayer GLB (or explicit SoT waiver).  
+5. Tracking-resume re-apply current `stepCode` visuals.  
+6. Tests: assert live sync scale reflects director `nodeScale`; assert intent path leaves intermediate overlay/model visible for a dwell (or step index stops mid-sequence until continue).
+
+### What Wave 4 correctly shipped (do not regress)
+
+- Yellow chloroplast overlay (not green).  
+- M2 intact zoom before torn damage.  
+- Membrane-local dark-blue leak (not fullscreen).  
+- M3 green contour + red X + force arrows on **dinding**, never `mitokondriaSolo`.  
+- User-only `resetTransform`; tabletop anchor stable across steps.  
+- Live AR stays on camera when supported; ModelViewer only as unsupported/fatal-init fallback.
+
+## Wave 5 — Critical fixes
+
+**Date:** 2026-07-26  
+**Gate target:** Clear Wave 4 Critical FAIL (live `nodeScale` ignore + intent instant collapse).  
+**Code changed:** `mission_scene_panel.dart`, `mission_screen.dart`, `misi1_visuals.dart`, `misi2_visual_helpers.dart`, `test/ar/wave5_ar_critical_fix_test.dart`.
+
+### Fixes shipped
+
+| # | Issue | Fix | Status |
+|---|---|---|---|
+| 1 | Live AR ignored `visual.nodeScale` | `combineLiveNodeScale` + `_liveScaleFor` in `_createNodeForAsset` / `_applyUserTransformToNodes` = `base × gesture × sequence` | **Fixed** |
+| 2 | Intent `_playSequenceFromCode` collapsed all steps | Timed dwell (`MissionScreen.intentStepDwell`, default 1000ms); mid-step `setState` + progress save; wait while `sequencePaused`; resume continues same step | **Fixed** |
+| 3 | Zoom not via engine API | `Misi1Visuals.zoomInternal` / `Misi2VisualHelpers.zoomIntactBilayer` call `focusOnTarget` + `smoothZoomToTarget` (stores `nodeScale` + fallback `cameraOrbit`) | **Fixed** |
+| 4 | Tracking recovery bare model | `MissionScenePanel.didUpdateWidget`: when `sequencePaused` false←true and `stepCode != null`, re-apply director visuals | **Fixed** |
+| 5 | Tests missed live/intent bugs | `wave5_ar_critical_fix_test.dart` asserts combined scale includes `nodeScale`, intent does not complete in 0ms, pause does not skip | **Added** |
+
+### PDF beat scorecard (post-fix)
+
+| Beat | Result | Notes |
+|---|---|---|
+| M1 smooth zoom through wall (live) | **PASS** | Live mesh scale applies director 1.55× via `smoothZoomToTarget` |
+| M2 zoom outer membrane (live) | **PASS** | `bilayerZoomScale` 1.35 reaches live path |
+| Intent progressive animation | **PASS** | Per-step dwell; no cross-mission auto-advance |
+| Tracking resume mid-step | **PASS** | Re-applies current `stepCode` visuals |
+
+### Explicit SoT waiver (deferred)
+
+- **Dedicated torn-bilayer GLB** — still using `RantaiProtein` proxy + `membraneDamage` overlay. Acceptable Wave 5 stub until asset lands (E0 gap). Not blocking Critical gate.
+
+### Remaining non-blocking gaps
+
+- Native AR camera dolly unavailable — zoom remains node-scale approx + ModelViewer orbit.  
+- Organelle submesh scales logical-only until plugin supports per-mesh nodes.  
+- Native particles / material glow still Flutter overlay stubs.
+
+## Wave 5 — Re-gate
+
+**Role:** ar-review-agent (re-gate after Wave 5 Critical fixes)  
+**Date:** 2026-07-26  
+**Prior gate:** Wave 4 — Review = **FAIL** (live `nodeScale` ignored; intent instant sequence collapse)  
+**Code re-read:** `mission_scene_panel.dart` (`combineLiveNodeScale`, `_liveScaleFor`, `_applyUserTransformToNodes`, `_createNodeForAsset`, tracking `didUpdateWidget` re-apply), `mission_screen.dart` (`_playSequenceFromCode`, `intentStepDwell`, `_dwellIntentStep`, pause wait), `misi1_visuals.dart`, `misi2_visual_helpers.dart`, `ar_scene_engine.dart` (`smoothZoomToTarget` / `focusOnTarget`), `test/ar/wave5_ar_critical_fix_test.dart`  
+**Tests:** `flutter test test/ar/wave5_ar_critical_fix_test.dart` → `+6` all passed
+
+### Gate verdict
+
+**PASS_WITH_GAPS**
+
+Wave 4 **Critical** blockers are cleared on the live camera path and intent playback. Remaining gaps are Important / accepted plugin stubs (torn-bilayer GLB proxy, native dolly approx, logical-only organelle submesh scales) — same class as Wave 4 non-blocking items, not ship-stoppers for the Critical gate.
+
+### Critical clearance (Wave 4 FAIL → fixed)
+
+| Prior Critical | Evidence | Status |
+|---|---|---|
+| Live AR ignored `visual.nodeScale` | `_liveScaleFor` / `_createNodeForAsset` / `_applyUserTransformToNodes` multiply `base × gesture × sequence`; engine `visualChanged` → `_syncNodesFromVisualState`; M1/M2 directors call `smoothZoomToTarget` so `nodeScale` is set | **Cleared** |
+| Intent `_playSequenceFromCode` instant collapse | Per-step `setState` + `intentStepDwell` (default 1000ms); `_waitWhileSequencePaused`; resume continues same beat; no M1→M2→M3 chain | **Cleared** |
+
+### PDF beat scorecard (final)
+
+| Beat (PDF SoT) | Result | Severity if gap | Evidence |
+|---|---|---|---|
+| **M1** Smooth zoom-in through cell wall (Sampel A) | **PASS*** | — | `Misi1Visuals.zoomInternal` → `focusOnTarget` + `smoothZoomToTarget(primary, 1.55)`; live mesh uses `_liveScaleFor` (`W5-01`/`W5-02`/`W5-06`). *Native AR camera dolly still unavailable — node-scale + ModelViewer orbit approx (accepted). |
+| **M1** Yellow glow on shrinking chloroplast | **PASS** | — | `chloroplastHighlight` `#FACC15` + `kloroplasSolo`; primary `nodeScale` now reaches live path |
+| **M1** Deflated giant vacuole | **PASS*** | — | `vakuolaMainSolo` + `vacuoleDamage` + opacity 0.82; *no GLB clip (E0) |
+| **M1** Tabletop / same plane anchor retained | **PASS** | — | Unchanged; steps never re-place |
+| **M2** Zoom to outer membrane / intact bilayer | **PASS*** | — | `zoomIntactBilayer` → `smoothZoomToTarget` 1.35; live sync (`W5-03`). *Dolly approx as M1 |
+| **M2** Torn phospholipid bilayer | **PASS_WITH_GAPS** | Important | `RantaiProtein` proxy + `membraneDamage` (SoT waiver / E0 asset gap) |
+| **M2** Dark-blue water from membrane | **PASS** | — | `waterLeak` membrane-anchored; not fullscreen |
+| **M3** Side-by-side A+B | **PASS** | — | Dual nodes + labels |
+| **M3** Green cell-wall contour on A | **PASS** | — | `cellWallHighlight` + `dindingSelSolo` |
+| **M3** Red X on B (no wall) | **PASS** | — | `missingStructureCross` on Sample B |
+| **M3** Force arrows on dinding (not mitokondria) | **PASS** | — | Registry + director assert ≠ `mitokondriaSolo` |
+| **No auto-advance missions** | **PASS** | — | Sequences do not chain M1→M2→M3 |
+| **Intent-driven progressive beats** | **PASS** | — | Timed dwell; mid-step UI; pause does not skip (`W5-04`/`W5-05`) |
+| **Fallback only when needed** | **PASS** | — | Soft ModelViewer only unsupported / fatal init before place |
+| **Tracking resume mid-step** | **PASS** | — | `didUpdateWidget` re-applies `stepCode` when pause clears |
+
+### Summary counts
+
+| PASS | PASS_WITH_GAPS | FAIL |
+|---|---|---|
+| 13 (+ 2 PASS\* dolly/clip stubs) | 1 (torn bilayer proxy) | 0 |
+
+### Remaining gaps (non-blocking)
+
+1. Dedicated torn-bilayer GLB (replace `RantaiProtein`) when asset lands.  
+2. True AR camera dolly / orbit — plugin gap; keep node-scale + fallback orbit.  
+3. Organelle submesh scales remain logical-only until per-mesh nodes exist.  
+4. Optional: green “wall resistance” cue on M3 force-arrows (amber inward today).
+
+### Do not regress
+
+- Live `nodeScale` sync (`_liveScaleFor` / `combineLiveNodeScale` contract).  
+- Intent per-step dwell + pause-safe playback.  
+- M1/M2 zoom via `smoothZoomToTarget` / `focusOnTarget`.  
+- Tracking-resume director re-apply.  
+- Wave 4 fidelity: yellow chloroplast, intact-before-torn, membrane-local leak, M3 dinding-only forces, user-only `resetTransform`, stable tabletop anchor.
+
+---
+
+## Live AR activation diagnosis
+
+**Date:** 2026-07-26  
+**Role:** live-ar-activation agent  
+**Devices / logs:** Pixel 8 (`39181FDJH0035S` / `shiba`) via `terminals/15.txt` — ARCore package installed, `CAMERA` granted. `flutter devices` may briefly miss USB; `adb devices` confirms the phone.
+
+### Root cause
+
+**Code path, not missing ARCore.** Terminal 15 shows only `ModelViewer initializing…` (dual Sample A/B WebViews). **Zero** `ARView` / SceneView / ARCore session lines. That means:
+
+```text
+MissionScenePanel.useAr == false          // mission_scene_panel.dart:_wantsLiveAr
+  ← StudentJourney.arSupported == false   // mission_screen.dart:useAr / Live vs Fake
+  ← Device check “Gunakan Mode 3D”
+     or restored SessionSnapshot.ar_supported == false
+```
+
+`FakeArSceneEngine` + ModelViewer place immediately (`_fallbackReady`). Soft `_liveInitFailed` was **not** hit.
+
+Contributing bugs:
+1. `DeviceCheckScreen` claimed to “memeriksa” AR but used two equal manual CTAs with **no native probe** (FR-010 gap) — Mode 3D was easy to pick.
+2. Choice is **sticky** via `SessionSnapshotStore` (`ar_supported`) across relaunches.
+3. Pixel 8 does **not** always declare `android.hardware.camera.ar` in `pm list features` — a feature-flag-only probe would false-negative; must use `ArCoreApk.checkAvailability`.
+
+Manifest already correct: `CAMERA`, `camera.ar` optional, `com.google.ar.core=optional`, minSdk 28. `debugUsePlaceholderScene` is test-only.
+
+### Changes shipped
+
+| Change | File(s) |
+|---|---|
+| Native probe via `ArCoreApk.checkAvailability` + camera permission | `MainActivity.kt`, `lib/ar/ar_capability_probe.dart` |
+| iOS ARKit probe (`ARWorldTrackingConfiguration` + camera) | `ios/Runner/AppDelegate.swift`, `ar_capability_probe.dart` |
+| Device check auto-probes; **Lanjut Mode AR** only when supported; Mode 3D only when not | `device_check_screen.dart` |
+| Stricter `isFatalLiveArInitFailure` (no bare `unavailable`) | `ar_capability_probe.dart`, `mission_scene_panel.dart` |
+| Mid-session **Aktifkan Mode AR** via `enableLiveAr()` | `student_journey.dart`, `mission_screen.dart`, `mission_scene_panel.dart` |
+| Path / engine `debugPrint` | `mission_scene_panel.dart`, `mission_screen.dart` |
+| Tests | `ar_capability_probe_test.dart`, `device_check_screen_test.dart`, journey tests |
+
+Group → Scene1 / intents / persistence / LKPD / POS / dashboard / auth / RLS untouched.
+
+### How to verify on device (Pixel / ARCore phone)
+
+1. Clear app data (or uninstall) so no Mode 3D snapshot restores.  
+2. `flutter run -d 39181FDJH0035S` (or current Pixel id) — **not** macOS/Chrome/x86 emulator without Play AR.  
+3. Device check → “AR siap” → **Lanjut Mode AR**.  
+4. Scene 1 UI: **Mode AR (Kamera)** + scan hint + camera preview (not auto-rotating ModelViewer).  
+5. Logs: `CellForensic AR probe: … supported=true`, `CellForensic scene engine: LiveArSceneEngine`, `MissionScenePanel path=live_ar useAr=true`, tag `CellForensicArProbe`.  
+6. Prior Mode 3D restore: tap **Aktifkan Mode AR (Kamera)** on the mission panel.  
+7. Negative: desktop/web/emulator without ARCore → Mode 3D only (environment).
+
+---
+
+## Final verification
+
+**Date:** 2026-07-26  
+**Role:** final-verify agent  
+**Workspace:** `/Users/macbookm2/CellForensic` (branch `main`)
+
+### Analyze
+
+```text
+flutter analyze
+→ No issues found! (ran in ~5–10s)
+```
+
+Also confirmed via Dart MCP `analyze_files` → no errors.
+
+### Tests
+
+```text
+flutter test   (machine inventory)
+→ suites=46 / 46 discovered
+→ +273 passed, 0 failed, 0 skipped
+```
+
+**Mandatory suites included:**
+
+| Suite | Cases | Status |
+|---|---|---|
+| `test/features/journey/pdf_flow_contract_test.dart` | 14 | Pass |
+| `test/ar/wave4_ar_fidelity_test.dart` (W4-01…W4-14) | 14 | Pass |
+| `test/ar/wave5_ar_critical_fix_test.dart` (W5-01…W5-06) | 6 | Pass |
+| `test/ar/ar_capability_probe_test.dart` (fatal matcher + probe) | 4 | Pass |
+| `device_check_screen_test` + `student_journey_test` (`enableLiveAr`) | covered in 273 | Pass |
+
+Disk space was cleaned (Gradle caches) before the full run after earlier ENOSPC risk.
+
+### DoD checklist (original AR fidelity request)
+
+| Criterion | Status |
+|---|---|
+| Live tabletop AR stays on camera; same plane anchor across steps | Met (code + W4/W5 tests) |
+| M1: zoom + yellow chloroplast glow + shrink + vacuole deflate | Met (live `nodeScale` + overlays; no GLB clips) |
+| M2: membrane zoom + torn bilayer + membrane-local water particles | Met (RantaiProtein proxy waived) |
+| M3: side-by-side + green wall contour + red X + force arrows on dinding | Met |
+| No auto-advance across missions; intent-driven triggers | Met |
+| Fallback only when AR unsupported / fatal init before place | Met (+ probe / Mode AR CTA) |
+| `flutter analyze` clean | Met |
+| Full `flutter test` green | Met (+273) |
+| No regression on group → Scene 1 / logbook / session / POS / dashboard / teacher auth | Met (flow suites in 273) |
+| Device smoke on ARCore hardware | **Pending** — see below |
+
+### Device test
+
+**Status: pending / unknown for post-fix live path.**
+
+Prior Pixel 8 `flutter run` logs (`terminals/730202.txt`, `15.txt`) showed only `ModelViewer initializing…` because `arSupported: false` (Mode 3D / sticky snapshot) — **not** an ARCore hardware failure. After live-AR activation fixes, a **new** physical ARCore run is still required:
+
+1. Clear app data / uninstall (drop sticky Mode 3D snapshot).  
+2. `flutter run` on Pixel / ARCore device.  
+3. Choose **Lanjut Mode AR**; confirm logcat `MissionScenePanel path=live_ar useAr=true`.  
+4. Place lab table → run M1–M3 intents; confirm camera stays up.
+
+Live AR **still requires a physical ARCore (or ARKit) device** — emulators / desktop cannot validate the camera path.
+
+### Remaining known gaps (non-blocking)
+
+1. **Plugin:** no native AR camera dolly, particle emitter, material glow, animation clips, or organelle mesh hit-test — Flutter overlay / node-scale / GLB-swap approximations remain.  
+2. **Asset waiver:** torn bilayer still uses `RantaiProtein` proxy (E0 / Wave 5 SoT waiver).  
+3. **Optional:** native pinch/rotate on live AR; green “wall resistance” cue on M3 force arrows; dedicated force-arrow GLB.  
+4. **Device:** post-activation `path=live_ar` smoke not yet re-confirmed on hardware in this verification pass.
+
+---
+
+## Organelle hotspots (Sampel A)
+
+**Date:** 2026-07-26  
+**Goal:** Tap kloroplas / vakuola raksasa → highlight + observation popup. Does **not** complete the mission and does **not** emit `sequenceCode`.
+
+### Targets (validated only)
+
+| Hotspot | Node id | Notes |
+|---|---|---|
+| Kloroplas | `chloroplast` | Multiple Flutter hit discs → same id (plant cell has several chloroplasts) |
+| Vakuola Raksasa | `vacuole` | Central giant vacuole |
+
+Provisional **Organel X/Y** are **not** labeled as definitive hotspots.
+
+### Hit-testing
+
+`ar_flutter_plugin_2` has no reliable organelle mesh pick. Implementation uses **Flutter hit targets** anchored via `ArOverlayFrame` (`chloroplastCenter` / `vacuoleCenter`), same pattern as glow overlays. Observation copy opens in `OrganelleObservationSheet` **below** the AR viewport (not clipped by the 280px scene). Live AR camera stays active; no navigation; no mid-session swap to `model_viewer_plus` when live AR works.
+
+### State (separate from mission progress)
+
+`none` → `selected` (tap / popup open) → `inspected` (popup closed or logbook note).  
+- No hotspot state before group + lab placement (`OrganelleHotspotController.enabled`).  
+- Reset scan clears **selected**; **inspected** may persist.  
+- `inspected` ≠ mission completed.
+
+### Actions
+
+| Action | Behavior |
+|---|---|
+| Tanya AI | Fills assistant input draft only — **never** auto-send |
+| Catat di Logbook | Opens logbook + focuses related prompt field |
+| Tutup | Marks inspected, closes popup |
+
+### Files
+
+- `lib/ar/organelle_hotspot.dart` — catalog + controller  
+- `lib/ar/organelle_hotspot_layer.dart` — in-scene hit targets + glow; `OrganelleObservationSheet` below the AR viewport  
+- `lib/ar/mission_scene_panel.dart` — layer after placement; sheet below scene; reset clears selection  
+- `lib/features/journey/screens/investigation/mission_screen.dart` — draft / logbook wiring  
+- `SessionSnapshot.inspected_organelle_hotspots` — optional persist of inspected ids  
+
+### Tests
+
+- `test/ar/organelle_hotspot_test.dart`  
+- `test/ar/organelle_hotspot_widget_test.dart`
+
+### Limitations
+
+- Hit targets are **approximate** 2D discs on Sample A frame — not true 3D mesh picks.  
+- Accuracy depends on model framing / dual-sample layout matching `ArOverlayFrame`.  
+- Live AR plane re-tap still works outside hotspot discs.  
+- Overlapping discs: kloroplas targets stack above vakuola so chloroplast taps win ties.
