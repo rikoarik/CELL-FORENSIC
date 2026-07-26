@@ -122,6 +122,10 @@ abstract final class MissionSequences {
   ///
   /// Five described beats, four step codes: [SequenceStepCodes.glowOrganelles]
   /// covers both the yellow highlight and the chloroplast shrink.
+  ///
+  /// Completes at [SequenceStepCodes.playShrinkAnimation] only — never
+  /// auto-chains into SEQ-MISI-2 / SEQ-MISI-3. Live AR keeps the Scene 1
+  /// tabletop anchor for every step (see [Misi1Visuals] / ArVisualDirector).
   static const misi1 = SequenceConfig(
     code: 'SEQ-MISI-1',
     steps: [

@@ -1,5 +1,6 @@
 import 'package:cell_forensic/ar/ar_asset_registry.dart';
 import 'package:cell_forensic/ar/ar_scene_engine.dart';
+import 'package:cell_forensic/ar/misi1_visuals.dart';
 import 'package:cell_forensic/domain/ai/ar_action_whitelist.dart';
 
 /// Applies mission sequence steps and whitelisted AI AR actions onto an
@@ -7,6 +8,9 @@ import 'package:cell_forensic/domain/ai/ar_action_whitelist.dart';
 ///
 /// Plugin limits: no native material glow / particle emitter — we combine GLB
 /// swap + [ArOverlayEffect] Flutter overlays attached to the model frame.
+///
+/// Misi 1 beats are delegated to [Misi1Visuals] so SEQ-MISI-1 stays tabletop-
+/// anchored and does not auto-chain into M2/M3.
 class ArVisualDirector {
   const ArVisualDirector();
 
@@ -23,46 +27,14 @@ class ArVisualDirector {
 
     switch ((missionCode, stepCode)) {
       case ('MISI-1', 'focus_sample_a'):
-        await engine.setSecondaryModel(null);
-        await engine.showNode(ArNodeIds.primary);
-        await engine.setMaterialHighlight(ArNodeIds.sampleA, enabled: true);
-        await engine.showAnchoredOverlayEffect(ArOverlayEffect.none);
-        await engine.setOpacity(1);
+        await Misi1Visuals.focusSampleA(engine);
       case ('MISI-1', 'zoom_internal'):
         // Stay on Sample A AllInOne — zoom toward kloroplas + vakuola (GAP-6).
-        await engine.setSecondaryModel(null);
-        await engine.setNodeScale(
-          ArNodeIds.primary,
-          const ArVec3(1.2, 1.2, 1.2),
-        );
-        await engine.setMaterialHighlight(ArNodeIds.chloroplast, enabled: true);
-        await engine.setNodeScale(
-          ArNodeIds.chloroplast,
-          const ArVec3(0.88, 0.88, 0.88),
-        );
-        await engine.setNodeScale(
-          ArNodeIds.vacuole,
-          const ArVec3(0.8, 0.8, 0.8),
-        );
-        await engine.showAnchoredOverlayEffect(
-          ArOverlayEffect.chloroplastHighlight,
-        );
+        await Misi1Visuals.zoomInternal(engine);
       case ('MISI-1', 'glow_organelles'):
-        await engine.setMaterialHighlight(ArNodeIds.chloroplast, enabled: true);
-        await engine.setNodeScale(
-          ArNodeIds.chloroplast,
-          const ArVec3(0.85, 0.85, 0.85),
-        );
-        await engine.showAnchoredOverlayEffect(
-          ArOverlayEffect.chloroplastHighlight,
-        );
+        await Misi1Visuals.glowOrganelles(engine);
       case ('MISI-1', 'play_shrink_animation'):
-        await engine.setNodeScale(
-          ArNodeIds.vacuole,
-          const ArVec3(0.7, 0.7, 0.7),
-        );
-        await engine.setOpacity(0.85);
-        await engine.showAnchoredOverlayEffect(ArOverlayEffect.vacuoleDamage);
+        await Misi1Visuals.playShrinkAnimation(engine);
       case ('MISI-2', 'focus_sample_b'):
         await engine.setSecondaryModel(null);
         await engine.setMaterialHighlight(ArNodeIds.membrane, enabled: true);
@@ -152,24 +124,15 @@ class ArVisualDirector {
         );
       case 'highlight_chloroplast':
         await engine.replaceModelAtActiveAnchor(ArAssetRegistry.kloroplasSolo);
-        await engine.setMaterialHighlight(ArNodeIds.chloroplast, enabled: true);
-        await engine.showAnchoredOverlayEffect(
-          ArOverlayEffect.chloroplastHighlight,
-        );
+        await Misi1Visuals.glowOrganelles(engine);
       case 'show_damaged_chloroplast':
         await engine.replaceModelAtActiveAnchor(ArAssetRegistry.kloroplasSolo);
-        await engine.setNodeScale(
-          ArNodeIds.chloroplast,
-          const ArVec3(0.8, 0.8, 0.8),
-        );
-        await engine.showAnchoredOverlayEffect(
-          ArOverlayEffect.chloroplastHighlight,
-        );
+        await Misi1Visuals.glowOrganelles(engine);
       case 'show_vacuole_damage':
         await engine.replaceModelAtActiveAnchor(
           ArAssetRegistry.vakuolaMainSolo,
         );
-        await engine.showAnchoredOverlayEffect(ArOverlayEffect.vacuoleDamage);
+        await Misi1Visuals.playShrinkAnimation(engine);
       case 'focus_membrane':
         await applySequenceStep(
           engine,

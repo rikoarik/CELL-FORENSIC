@@ -256,3 +256,34 @@ MISI-3  show_both_samples     → live tabletop AR
 ### Animation
 
 `ArSceneOverlayLayer` is stateful with a repeating ticker for `waterLeak`, `chloroplastHighlight`, and `forceArrows` so particles/glow stay alive without native emitters.
+
+---
+
+## Wave 2 — Misi 1
+
+**Branch:** `wave2/misi-1`  
+**Owner:** mission-1-agent  
+**Date:** 2026-07-26  
+**Scope:** SEQ-MISI-1 only (`lib/ar/misi1_visuals.dart`, M1 cases in `ar_visual_director.dart`, `MissionSequences.misi1`, M1 camera orbits, yellow chloroplast overlay color). Does **not** rewrite `ar_scene_engine.dart`.
+
+### Visual steps (PDF SoT → live tabletop)
+
+| Step | Asset | Live AR behavior | Fallback ModelViewer |
+|---|---|---|---|
+| `focus_sample_a` | `sampleA` AllInOne | Clear secondary / Sample B; highlight Sample A; reset organelle scales; **same lab-table anchor** | Orbit `0deg 72deg 2.0m` |
+| `zoom_internal` | stays `sampleA` | Primary scale **1.55** + slight Y lift (through-wall approx); focus kloroplas+vakuola scales; **no** yellow glow yet | Orbit `0deg 58deg 1.05m` |
+| `glow_organelles` | `KlooroPlas_Solo` | Yellow `chloroplastHighlight` overlay (`#FACC15`); chloroplast scale **0.72** (shrunk/damaged) | Orbit `35deg 50deg 1.35m` |
+| `play_shrink_animation` | `VakolaMain_Solo` | `vacuoleDamage` overlay; vacuole scale **0.55** (deflated); opacity 0.82 — **SEQ ends here** (no auto M2) | Orbit `25deg 65deg 1.25m` |
+
+### Engine API gap (documented, not implemented here)
+
+| Desired | Status |
+|---|---|
+| `smoothZoomToTarget` / `focusOnTarget` | **Needed** for true AR dolly — currently approximated via `setNodeScale` + `setNodePosition` in `Misi1Visuals.zoomInternal` |
+| Native yellow material | **Unavailable** — Flutter overlay yellow glow |
+
+### Guarantees
+
+- Placement / `labTableModelPath` never cleared by M1 steps.
+- `MissionSequences.misi1` still four steps only; sequence engine does not start M2/M3.
+- Group / session / LKPD flows untouched.
