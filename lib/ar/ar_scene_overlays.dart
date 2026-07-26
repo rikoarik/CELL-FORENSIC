@@ -131,6 +131,7 @@ class _ArOverlayPainter extends CustomPainter {
         paintMembraneDamage(canvas, frame);
         paintWaterLeakParticles(canvas, frame, t: t);
       case ArOverlayEffect.cellWallHighlight:
+        // PDF Misi 3: green cell-wall contour on Sample A.
         paintCellWallContour(canvas, frame);
       case ArOverlayEffect.missingStructureCross:
         if (dualSamples) {
@@ -138,6 +139,7 @@ class _ArOverlayPainter extends CustomPainter {
         }
         paintMissingStructureCross(canvas, frame);
       case ArOverlayEffect.forceArrows:
+        // PDF Misi 3: force arrows on dinding (Sample A) + optional B cues.
         if (dualSamples) {
           paintComparisonLabels(canvas, frame);
           paintCellWallContour(canvas, frame);
@@ -156,7 +158,8 @@ class _ArOverlayPainter extends CustomPainter {
     }
 
     if (highlightTarget == ArNodeIds.cellWall &&
-        effect != ArOverlayEffect.cellWallHighlight) {
+        effect != ArOverlayEffect.cellWallHighlight &&
+        effect != ArOverlayEffect.forceArrows) {
       paintCellWallContour(canvas, frame);
     }
 

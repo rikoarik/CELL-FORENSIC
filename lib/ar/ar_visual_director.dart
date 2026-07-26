@@ -2,6 +2,7 @@ import 'package:cell_forensic/ar/ar_asset_registry.dart';
 import 'package:cell_forensic/ar/ar_scene_engine.dart';
 import 'package:cell_forensic/ar/misi1_visuals.dart';
 import 'package:cell_forensic/ar/misi2_visual_helpers.dart';
+import 'package:cell_forensic/ar/misi3_visuals.dart';
 import 'package:cell_forensic/domain/ai/ar_action_whitelist.dart';
 
 /// Applies mission sequence steps and whitelisted AI AR actions onto an
@@ -11,7 +12,9 @@ import 'package:cell_forensic/domain/ai/ar_action_whitelist.dart';
 /// swap + [ArOverlayEffect] Flutter overlays attached to the model frame.
 ///
 /// Misi 1 beats are delegated to [Misi1Visuals] so SEQ-MISI-1 stays tabletop-
-/// anchored and does not auto-chain into M2/M3.
+/// anchored and does not auto-chain into M2/M3. Misi 2 uses [Misi2VisualHelpers]
+/// (membrane-anchored leak). Misi 3 uses [Misi3Visuals] so SEQ-MISI-3 stays A+B
+/// side-by-side (force arrows never swap to mitokondria).
 class ArVisualDirector {
   const ArVisualDirector();
 
@@ -49,39 +52,13 @@ class ArVisualDirector {
         // PDF: partikel air biru tua menyembur dari area membran (bukan fullscreen).
         await Misi2VisualHelpers.playMembraneLeakParticles(engine);
       case ('MISI-3', 'show_both_samples'):
-        await engine.replaceModelAtActiveAnchor(ArAssetRegistry.sampleA);
-        await engine.setSecondaryModel(
-          ArAssetRegistry.sampleB,
-          offsetX: 0.14,
-        );
-        await engine.showAnchoredOverlayEffect(
-          ArOverlayEffect.comparisonLabels,
-        );
+        await Misi3Visuals.showBothSamples(engine);
       case ('MISI-3', 'highlight_cell_wall'):
-        await engine.replaceModelAtActiveAnchor(ArAssetRegistry.dindingSelSolo);
-        await engine.setSecondaryModel(
-          ArAssetRegistry.sampleB,
-          offsetX: 0.14,
-        );
-        await engine.setMaterialHighlight(ArNodeIds.cellWall, enabled: true);
-        await engine.showAnchoredOverlayEffect(
-          ArOverlayEffect.cellWallHighlight,
-        );
+        await Misi3Visuals.highlightCellWall(engine);
       case ('MISI-3', 'mark_sample_b'):
-        await engine.replaceModelAtActiveAnchor(ArAssetRegistry.sampleA);
-        await engine.setSecondaryModel(
-          ArAssetRegistry.sampleB,
-          offsetX: 0.14,
-        );
-        await engine.showAnchoredOverlayEffect(
-          ArOverlayEffect.missingStructureCross,
-        );
+        await Misi3Visuals.markSampleB(engine);
       case ('MISI-3', 'show_force_arrows'):
-        await engine.setSecondaryModel(
-          ArAssetRegistry.sampleB,
-          offsetX: 0.14,
-        );
-        await engine.showAnchoredOverlayEffect(ArOverlayEffect.forceArrows);
+        await Misi3Visuals.showForceArrows(engine);
       default:
         break;
     }

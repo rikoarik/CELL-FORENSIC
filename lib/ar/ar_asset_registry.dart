@@ -63,11 +63,12 @@ class ArAssetRegistry {
       ('MISI-2', 'show_torn_bilayer') => rantaiProtein,
       ('MISI-2', 'play_leak_particles') => rantaiProtein,
 
-      // Misi 3 — bandingkan lapisan terluar
+      // Misi 3 — bandingkan lapisan terluar (never mitokondriaSolo on arrows).
       ('MISI-3', 'show_both_samples') => sampleA,
       ('MISI-3', 'highlight_cell_wall') => dindingSelSolo,
-      ('MISI-3', 'mark_sample_b') => sampleB,
-      ('MISI-3', 'show_force_arrows') => mitokondriaSolo,
+      ('MISI-3', 'mark_sample_b') => sampleA,
+      // Wave 1 bugfix: stay dinding/sampleA — not mitokondriaSolo.
+      ('MISI-3', 'show_force_arrows') => dindingSelSolo,
 
       _ => null,
     };
