@@ -74,13 +74,20 @@ class ArAssetRegistry {
   }
 
   /// Model Viewer camera orbit hint per step (drag/pinch still enabled).
+  ///
+  /// Misi 1 orbits pull closer for “through wall” framing (fallback only —
+  /// live AR approximates zoom via [Misi1Visuals] node scale, not dolly).
   static String cameraOrbitForStep(String? stepCode) {
     return switch (stepCode) {
-      'zoom_internal' || 'zoom_membrane' => '0deg 65deg 1.4m',
-      'glow_organelles' || 'highlight_cell_wall' => '40deg 55deg 1.8m',
+      // M1: through-wall → organelle focus → yellow glow → deflated vacuole
+      'zoom_internal' => '0deg 58deg 1.05m',
+      'glow_organelles' => '35deg 50deg 1.35m',
+      'play_shrink_animation' => '25deg 65deg 1.25m',
+      'focus_sample_a' => '0deg 72deg 2.0m',
+      'zoom_membrane' => '0deg 65deg 1.4m',
+      'highlight_cell_wall' => '40deg 55deg 1.8m',
       'show_torn_bilayer' || 'play_leak_particles' => '10deg 80deg 1.2m',
       'show_both_samples' || 'show_force_arrows' => '0deg 70deg 2.8m',
-      'play_shrink_animation' => '20deg 70deg 1.5m',
       _ => '0deg 75deg 2.2m',
     };
   }

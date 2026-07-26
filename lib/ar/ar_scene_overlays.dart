@@ -53,11 +53,12 @@ class _ArOverlayPainter extends CustomPainter {
 
     switch (effect) {
       case ArOverlayEffect.chloroplastHighlight:
+        // PDF Misi 1: yellow chloroplast glow (not green).
         _glow(
           canvas,
           center.translate(-modelRadius * 0.25, 0),
           modelRadius * 0.45,
-          const Color(0xFF22C55E),
+          const Color(0xFFFACC15),
         );
       case ArOverlayEffect.vacuoleDamage:
         _glow(
@@ -111,7 +112,7 @@ class _ArOverlayPainter extends CustomPainter {
         canvas,
         center.translate(-modelRadius * 0.25, 0),
         modelRadius * 0.4,
-        const Color(0xFF22C55E),
+        const Color(0xFFFACC15),
       );
     }
   }

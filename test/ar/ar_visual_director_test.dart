@@ -78,12 +78,67 @@ void main() {
         ArAssetRegistry.sampleA);
     expect(engine.visualState.highlightTarget, ArNodeIds.chloroplast);
     expect(
-      engine.visualState.nodeScale[ArNodeIds.vacuole],
-      const ArVec3(0.8, 0.8, 0.8),
+      engine.visualState.nodeScale[ArNodeIds.primary],
+      const ArVec3(1.55, 1.55, 1.55),
     );
-    expect(engine.visualState.overlay, ArOverlayEffect.chloroplastHighlight);
+    expect(
+      engine.visualState.nodeScale[ArNodeIds.vacuole],
+      const ArVec3(0.88, 0.88, 0.88),
+    );
+    // Yellow glow reserved for glow_organelles — zoom is framing only.
+    expect(engine.visualState.overlay, ArOverlayEffect.none);
+    expect(engine.visualState.secondaryModelPath, isNull);
     // Lab table anchor asset persists across the zoom step.
     expect(engine.visualState.labTableModelPath, ArAssetRegistry.mejaLab);
+  });
+
+  test('M1 SEQ-MISI-1 full path keeps placement and ends on vacuole', () async {
+    await engine.place(const ArPlacement(x: 0.2, y: 0, z: -0.8));
+    await engine.initLabScene(
+      labTableModelPath: ArAssetRegistry.mejaLab,
+      sampleAModelPath: ArAssetRegistry.sampleA,
+      sampleBModelPath: ArAssetRegistry.sampleB,
+    );
+    final placement = engine.placement;
+
+    await director.applySequenceStep(
+      engine,
+      missionCode: 'MISI-1',
+      stepCode: 'focus_sample_a',
+    );
+    await director.applySequenceStep(
+      engine,
+      missionCode: 'MISI-1',
+      stepCode: 'zoom_internal',
+    );
+    await director.applySequenceStep(
+      engine,
+      missionCode: 'MISI-1',
+      stepCode: 'glow_organelles',
+    );
+    expect(engine.visualState.activeModelPath, ArAssetRegistry.kloroplasSolo);
+    expect(engine.visualState.overlay, ArOverlayEffect.chloroplastHighlight);
+    expect(
+      engine.visualState.nodeScale[ArNodeIds.chloroplast],
+      const ArVec3(0.72, 0.72, 0.72),
+    );
+
+    await director.applySequenceStep(
+      engine,
+      missionCode: 'MISI-1',
+      stepCode: 'play_shrink_animation',
+    );
+
+    expect(engine.placement, placement);
+    expect(engine.visualState.labTableModelPath, ArAssetRegistry.mejaLab);
+    expect(engine.visualState.activeModelPath, ArAssetRegistry.vakuolaMainSolo);
+    expect(engine.visualState.overlay, ArOverlayEffect.vacuoleDamage);
+    expect(
+      engine.visualState.nodeScale[ArNodeIds.vacuole],
+      const ArVec3(0.55, 0.55, 0.55),
+    );
+    // M1 complete — still no secondary / no auto M2 sample.
+    expect(engine.visualState.secondaryModelPath, isNull);
   });
 
   test('valid AI action executes; unknown / mismatch / low conf rejected',
