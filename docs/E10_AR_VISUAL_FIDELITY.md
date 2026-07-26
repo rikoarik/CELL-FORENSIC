@@ -352,3 +352,32 @@ MISI-3  show_both_samples     → live tabletop AR
 
 - `test/ar/ar_visual_director_test.dart` — full M3 beat + asserts active model ≠ `mitokondriaSolo`
 - Placement preserved across all four SEQ-MISI-3 steps
+
+---
+
+## Wave 3 — Merge
+
+**Date:** 2026-07-26  
+**Target:** `main` workspace `/Users/macbookm2/CellForensic`  
+**Order:** `wave2/ar-engine-api` → `wave2/ar-overlay-effects` → `wave2/misi-1` → `wave2/misi-2-visual` → `wave2/misi-3`
+
+### Conflicts resolved
+
+| File | Resolution |
+|---|---|
+| `lib/ar/ar_scene_engine.dart` | Engine branch only (no mission conflict) — focus/zoom/outline APIs + **user-only `resetTransform`** |
+| `lib/ar/ar_visual_director.dart` | **All** M1 + M2 + M3 cases kept via `Misi1Visuals` / `Misi2VisualHelpers` / `Misi3Visuals` |
+| `lib/ar/ar_scene_overlays.dart` | Overlay painters (`ar_overlay_painters.dart`) win; mission comments retained (yellow glow, membrane leak, green contour / force arrows) |
+| `docs/E10_AR_VISUAL_FIDELITY.md` | Concatenated all Wave 2 sections (Engine, Overlays, Misi 1–3) |
+
+### Invariants preserved
+
+- M3 `show_force_arrows` → `dindingSelSolo` (not `mitokondriaSolo`)
+- M2 `waterLeak` membrane-anchored (`highlightTarget=membrane` + rim spray painter)
+- `resetTransform` resets `userScale` / `userRotationY` only
+- Group → Scene1 / intent-driven missions / no auto-start M1 untouched
+- Live-AR agent `67216d2e` left **no** uncommitted fixes (diagnosis incomplete)
+
+### Merged commits on `main`
+
+`d8e1f9f` engine → `4fbe412` overlays → `e02d697` M1 → `7a899a9` M2 → `a782aaf` M3 (+ Wave 3 merge commits)
