@@ -173,3 +173,51 @@ MISI-3  show_both_samples     → live tabletop AR
 
 8. **ModelViewer remount vs eager load**  
    Keys include `$_activeAsset` (`:589`, `:627`) so step swaps remount the viewer; eager loading mitigates flash — consider mission-stable key + `src` update if remount jank appears on device.
+
+---
+
+## Wave 2 — Engine API
+
+**Owner:** `lib/ar/ar_scene_engine.dart` (`LiveArSceneEngine` + `FakeArSceneEngine` via `ControllableArSceneEngine`)  
+**Branch:** `wave2/ar-engine-api`  
+**Date:** 2026-07-26
+
+### Methods added / finalized
+
+| Method | Behavior | Placement safe? |
+|---|---|---|
+| `focusOnTarget(nodeId)` | Sets `focusTarget` + `highlightTarget`; ensures node visible | Yes |
+| `smoothZoomToTarget(nodeId, {factor, cameraOrbit})` | Sets `zoomTarget`/`zoomFactor`; scales node as live approx; stores `cameraOrbit` for ModelViewer fallback | Yes |
+| `showNode` / `hideNode` | Visibility map (unchanged) | Yes |
+| `replaceNodeModel(nodeId, assetPath)` | Per-node GLB path in `nodeModels`; maps primary/sampleA → `activeModelPath`, sampleB → secondary, labTable → lab path | Yes (same anchor) |
+| `setNodeScale` / `setNodePosition` / `setNodeRotation` | Sequence transforms (unchanged) | Yes |
+| `setMaterialHighlight` | `highlightTarget` → Flutter glow overlay | Yes |
+| `setOutline(nodeId, {enabled})` | `outlineTarget` → Flutter contour overlay (no native outline) | Yes |
+| `setOpacity` | Global opacity (unchanged) | Yes |
+| `showAnchoredOverlay(effect)` | Preferred name for anchored Flutter overlays | Yes |
+| `showParticleOverlay(effect)` | Particle-oriented alias → same overlay slot (`waterLeak`, etc.) | Yes |
+| `resetSceneFocus()` | Clears focus/zoom/highlight/outline/`cameraOrbit`; restores pre-zoom node scale only | Yes |
+| `replaceModelAtActiveAnchor` | Delegates to `replaceNodeModel(primary, …)` | Yes |
+| `showAnchoredOverlayEffect` | Compat alias → `showAnchoredOverlay` | Yes |
+| `resetTransform()` | **Fixed:** resets `userScale`/`userRotationY` only — preserves sequence `nodeScale`/`nodePosition`/`nodeRotationY` | Yes |
+
+### Visual state fields added
+
+`focusTarget`, `zoomTarget`, `zoomFactor`, `cameraOrbit`, `outlineTarget`, `nodeModels`.
+
+### Plugin limits (still approximated)
+
+| Capability | Plugin (`ar_flutter_plugin_2`) | Engine approximation |
+|---|---|---|
+| AR camera dolly / orbit to organelle | **Fail** | `smoothZoomToTarget` → node scale + optional `cameraOrbit` for fallback ModelViewer |
+| Native material glow / tint | **Fail / not exposed** | `setMaterialHighlight` + overlay agents |
+| Native mesh outline / contour | **Fail** | `setOutline` → `outlineTarget` for Flutter painter |
+| Particle emitter | **Fail** | `showParticleOverlay` → `ArOverlayEffect` (e.g. `waterLeak`) |
+| Per-organelle mesh nodes | **Partial** (logical ids only) | `nodeModels` + GLB swap on primary/secondary |
+| Stable plane anchor across sequence | **Pass** | All Wave 2 APIs forbid mid-sequence `place`/`reset` |
+
+### Non-goals (this wave)
+
+- Does **not** force `model_viewer` fallback (live activation owned elsewhere).
+- Does **not** change group/session/LKPD/POS/auth flows.
+- Overlay painters / mission directors consume these APIs in sibling Wave 2 agents.

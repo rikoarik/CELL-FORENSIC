@@ -164,5 +164,83 @@ void main() {
       expect(engine.placement, isNotNull);
       await engine.dispose();
     });
+
+    test('Wave2 focus/zoom/outline APIs keep placement and restore zoom',
+        () async {
+      final engine = LiveArSceneEngine();
+      await engine.place(const ArPlacement(x: 0, y: 0, z: 0));
+      await engine.setNodeScale(ArNodeIds.primary, ArVec3.one);
+      await engine.focusOnTarget(ArNodeIds.sampleA);
+      await engine.smoothZoomToTarget(
+        ArNodeIds.primary,
+        factor: 1.5,
+        cameraOrbit: '0deg 65deg 1.4m',
+      );
+      await engine.setOutline(ArNodeIds.cellWall, enabled: true);
+      await engine.replaceNodeModel(
+        ArNodeIds.chloroplast,
+        'assets/ar_models/kloroplas.glb',
+      );
+      await engine.showAnchoredOverlay(ArOverlayEffect.chloroplastHighlight);
+      await engine.showParticleOverlay(ArOverlayEffect.waterLeak);
+
+      expect(engine.placement, isNotNull);
+      expect(engine.visualState.focusTarget, ArNodeIds.sampleA);
+      expect(engine.visualState.zoomTarget, ArNodeIds.primary);
+      expect(engine.visualState.zoomFactor, 1.5);
+      expect(engine.visualState.cameraOrbit, '0deg 65deg 1.4m');
+      expect(engine.visualState.outlineTarget, ArNodeIds.cellWall);
+      expect(
+        engine.visualState.nodeModels[ArNodeIds.chloroplast],
+        'assets/ar_models/kloroplas.glb',
+      );
+      expect(engine.visualState.overlay, ArOverlayEffect.waterLeak);
+      expect(
+        engine.visualState.nodeScale[ArNodeIds.primary],
+        const ArVec3(1.5, 1.5, 1.5),
+      );
+
+      await engine.resetSceneFocus();
+      expect(engine.placement, isNotNull);
+      expect(engine.visualState.focusTarget, isNull);
+      expect(engine.visualState.zoomTarget, isNull);
+      expect(engine.visualState.zoomFactor, 1);
+      expect(engine.visualState.highlightTarget, isNull);
+      expect(engine.visualState.outlineTarget, isNull);
+      expect(engine.visualState.cameraOrbit, isNull);
+      // Pre-zoom sequence scale restored.
+      expect(engine.visualState.nodeScale[ArNodeIds.primary], ArVec3.one);
+
+      await engine.dispose();
+    });
+
+    test('resetTransform preserves sequence nodeScale/nodePosition', () async {
+      final engine = FakeArSceneEngine();
+      await engine.place(const ArPlacement(x: 1, y: 0, z: 0));
+      await engine.setNodeScale(
+        ArNodeIds.primary,
+        const ArVec3(1.2, 1.2, 1.2),
+      );
+      await engine.setNodePosition(
+        ArNodeIds.primary,
+        const ArVec3(0.1, 0.03, 0),
+      );
+      await engine.setUserTransform(scale: 1.8, rotationY: 0.4);
+
+      await engine.resetTransform();
+
+      expect(engine.visualState.userScale, 1);
+      expect(engine.visualState.userRotationY, 0);
+      expect(
+        engine.visualState.nodeScale[ArNodeIds.primary],
+        const ArVec3(1.2, 1.2, 1.2),
+      );
+      expect(
+        engine.visualState.nodePosition[ArNodeIds.primary],
+        const ArVec3(0.1, 0.03, 0),
+      );
+      expect(engine.placement, isNotNull);
+      await engine.dispose();
+    });
   });
 }
