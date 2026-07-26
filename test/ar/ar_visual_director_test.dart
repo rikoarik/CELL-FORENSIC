@@ -56,6 +56,67 @@ void main() {
     expect(engine.visualState.overlay, ArOverlayEffect.comparisonLabels);
   });
 
+  test('M3 SEQ full beat: A+B → green wall → red X → force arrows on dinding',
+      () async {
+    await engine.place(const ArPlacement(x: 0, y: 0, z: -1));
+    final placement = engine.placement;
+
+    await director.applySequenceStep(
+      engine,
+      missionCode: 'MISI-3',
+      stepCode: 'show_both_samples',
+    );
+    expect(engine.visualState.activeModelPath, ArAssetRegistry.sampleA);
+    expect(engine.visualState.secondaryModelPath, ArAssetRegistry.sampleB);
+    expect(engine.visualState.overlay, ArOverlayEffect.comparisonLabels);
+    expect(
+      engine.visualState.nodeScale[ArNodeIds.primary],
+      ArVec3.one,
+    );
+
+    await director.applySequenceStep(
+      engine,
+      missionCode: 'MISI-3',
+      stepCode: 'highlight_cell_wall',
+    );
+    expect(engine.visualState.activeModelPath, ArAssetRegistry.dindingSelSolo);
+    expect(engine.visualState.secondaryModelPath, ArAssetRegistry.sampleB);
+    expect(engine.visualState.highlightTarget, ArNodeIds.cellWall);
+    expect(engine.visualState.overlay, ArOverlayEffect.cellWallHighlight);
+
+    await director.applySequenceStep(
+      engine,
+      missionCode: 'MISI-3',
+      stepCode: 'mark_sample_b',
+    );
+    expect(engine.visualState.activeModelPath, ArAssetRegistry.sampleA);
+    expect(engine.visualState.secondaryModelPath, ArAssetRegistry.sampleB);
+    expect(engine.visualState.overlay, ArOverlayEffect.missingStructureCross);
+
+    await director.applySequenceStep(
+      engine,
+      missionCode: 'MISI-3',
+      stepCode: 'show_force_arrows',
+    );
+    // Wave 1 bug: must NOT swap to mitokondriaSolo.
+    expect(
+      engine.visualState.activeModelPath,
+      ArAssetRegistry.dindingSelSolo,
+    );
+    expect(
+      engine.visualState.activeModelPath,
+      isNot(ArAssetRegistry.mitokondriaSolo),
+    );
+    expect(engine.visualState.secondaryModelPath, ArAssetRegistry.sampleB);
+    expect(engine.visualState.overlay, ArOverlayEffect.forceArrows);
+    expect(engine.visualState.highlightTarget, ArNodeIds.cellWall);
+    expect(
+      ArAssetRegistry.modelForStep('MISI-3', 'show_force_arrows'),
+      ArAssetRegistry.dindingSelSolo,
+    );
+    expect(engine.placement, placement);
+  });
+
   test('M1 zoom_internal stays on Sample A — not nukleusSolo (GAP-6)', () async {
     await engine.place(const ArPlacement(x: 0, y: 0, z: -1));
     await engine.initLabScene(

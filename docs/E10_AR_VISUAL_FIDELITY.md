@@ -173,3 +173,34 @@ MISI-3  show_both_samples     → live tabletop AR
 
 8. **ModelViewer remount vs eager load**  
    Keys include `$_activeAsset` (`:589`, `:627`) so step swaps remount the viewer; eager loading mitigates flash — consider mission-stable key + `src` update if remount jank appears on device.
+
+## Wave 2 — Misi 3
+
+**Mode:** IMPLEMENT (Misi 3 / SEQ-MISI-3 only).  
+**Branch:** `wave2/misi-3`  
+**Date:** 2026-07-26.  
+**Owned files:** `misi3_visuals.dart`, `ar_visual_director.dart` (M3 cases), `sequence_engine.dart` (SEQ-MISI-3 docs), `ar_asset_registry.dart` (M3 `modelForStep`), `ar_scene_overlays.dart` (green contour + force arrows).  
+**Out of scope:** `ar_scene_engine.dart` (not edited).
+
+### PDF visual steps (realized)
+
+| Step | Code | Visual |
+|---|---|---|
+| 1 | `show_both_samples` | Sampel A + Sampel B side-by-side on same tabletop (`offsetX: 0.14`, matched `ArVec3.one` proportions) + comparison labels |
+| 2 | `highlight_cell_wall` | Primary → `DindingSel_Solo`; Sample B secondary; green cell-wall contour overlay (`cellWallHighlight`) |
+| 3 | `mark_sample_b` | Restore A+B pair; red X on B (`missingStructureCross` — “Tidak ada dinding sel”) |
+| 4 | `show_force_arrows` | Stay on **dinding/sampleA** (`dindingSelSolo`) + Sample B; `forceArrows` overlay (amber inward pressure + green resistance). **Not** `mitokondriaSolo` |
+
+### Wave 1 bug fix
+
+| Before | After |
+|---|---|
+| `modelForStep('MISI-3','show_force_arrows')` → `mitokondriaSolo` | → `dindingSelSolo` |
+| Director only set secondary + overlay | `Misi3Visuals.showForceArrows` re-pairs dinding + B, highlights cell wall, force-arrows overlay |
+| `mark_sample_b` registry → `sampleB` (then director restored A) | → `sampleA` (matches A+B pair) |
+| `cellWallHighlight` amber glow | Green glow + contour ring (`#22C55E` / `#16A34A`) |
+
+### Verification
+
+- `test/ar/ar_visual_director_test.dart` — full M3 beat + asserts active model ≠ `mitokondriaSolo`
+- Placement preserved across all four SEQ-MISI-3 steps

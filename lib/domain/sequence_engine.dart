@@ -144,8 +144,12 @@ abstract final class MissionSequences {
     ],
   );
 
-  /// Misi 3 — A+B side-by-side → green cell wall on A → red X on B → force
-  /// arrows showing the wall resisting pressure.
+  /// Misi 3 — PDF Scene 2 comparison (SEQ-MISI-3 only; does not chain M1/M2):
+  /// 1. A+B side-by-side on tabletop (matched proportions)
+  /// 2. green cell-wall contour on A (`DindingSel_Solo`)
+  /// 3. red X on B (no wall)
+  /// 4. force arrows — wall resists pressure (stay dinding/sampleA; never
+  ///    swap to mitokondriaSolo)
   static const misi3 = SequenceConfig(
     code: 'SEQ-MISI-3',
     steps: [

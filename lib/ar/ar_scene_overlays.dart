@@ -76,7 +76,9 @@ class _ArOverlayPainter extends CustomPainter {
           modelRadius,
         );
       case ArOverlayEffect.cellWallHighlight:
-        _glow(canvas, center, modelRadius * 1.05, const Color(0xFFFBBF24));
+        // PDF Misi 3: green cell-wall contour on Sampel A (not amber glow).
+        _glow(canvas, center, modelRadius * 1.05, const Color(0xFF22C55E));
+        _contourRing(canvas, center, modelRadius * 1.02, const Color(0xFF16A34A));
       case ArOverlayEffect.missingStructureCross:
         _cross(
           canvas,
@@ -89,6 +91,19 @@ class _ArOverlayPainter extends CustomPainter {
           'Tidak ada dinding sel',
         );
       case ArOverlayEffect.forceArrows:
+        // Keep A/B labels + green wall contour while force arrows animate.
+        _label(
+          canvas,
+          center.translate(-modelRadius * 1.1, -modelRadius),
+          'Sampel A',
+        );
+        _label(
+          canvas,
+          center.translate(modelRadius * 1.1, -modelRadius),
+          'Sampel B',
+        );
+        _glow(canvas, center, modelRadius * 1.05, const Color(0xFF22C55E));
+        _contourRing(canvas, center, modelRadius * 1.02, const Color(0xFF16A34A));
         _arrows(canvas, center, modelRadius);
       case ArOverlayEffect.comparisonLabels:
         _label(
@@ -180,17 +195,48 @@ class _ArOverlayPainter extends CustomPainter {
     canvas.drawLine(c.translate(size, -size), c.translate(-size, size), paint);
   }
 
-  void _arrows(Canvas canvas, Offset c, double r) {
+  /// Green contour stroke used for dinding-sel highlight (Misi 3).
+  void _contourRing(Canvas canvas, Offset c, double r, Color color) {
     final paint = Paint()
+      ..color = color.withValues(alpha: 0.95)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.5;
+    canvas.drawCircle(c, r, paint);
+    canvas.drawCircle(
+      c,
+      r * 0.92,
+      paint
+        ..strokeWidth = 1.5
+        ..color = color.withValues(alpha: 0.55),
+    );
+  }
+
+  /// External pressure → wall; wall resistance arrows (Misi 3 force beat).
+  void _arrows(Canvas canvas, Offset c, double r) {
+    final pressure = Paint()
       ..color = const Color(0xFFF59E0B)
       ..strokeWidth = 3
       ..strokeCap = StrokeCap.round;
+    final resist = Paint()
+      ..color = const Color(0xFF22C55E)
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+
+    // Inward pressure (amber) from left/right onto the wall ring.
     for (final dir in [-1.0, 1.0]) {
-      final start = c.translate(dir * r * 0.2, -r * 0.1);
-      final end = c.translate(dir * r * 1.2, -r * 0.1);
-      canvas.drawLine(start, end, paint);
-      canvas.drawLine(end, end.translate(-dir * 12, -8), paint);
-      canvas.drawLine(end, end.translate(-dir * 12, 8), paint);
+      final start = c.translate(dir * r * 1.35, -r * 0.05);
+      final end = c.translate(dir * r * 1.05, -r * 0.05);
+      canvas.drawLine(start, end, pressure);
+      canvas.drawLine(end, end.translate(dir * 10, -7), pressure);
+      canvas.drawLine(end, end.translate(dir * 10, 7), pressure);
+    }
+    // Outward resistance (green) from the wall — dinding menahan tekanan.
+    for (final dir in [-1.0, 1.0]) {
+      final start = c.translate(dir * r * 0.95, r * 0.15);
+      final end = c.translate(dir * r * 1.3, r * 0.15);
+      canvas.drawLine(start, end, resist);
+      canvas.drawLine(end, end.translate(-dir * 10, -7), resist);
+      canvas.drawLine(end, end.translate(-dir * 10, 7), resist);
     }
   }
 
