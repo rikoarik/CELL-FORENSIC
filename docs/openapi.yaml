@@ -1,0 +1,173 @@
+openapi: 3.1.0
+info:
+  title: Cell Forensic API
+  version: 2.1.0
+  description: Foundation contract. Mutating retries use Idempotency-Key; versioned updates require base_version and return 409 when stale.
+servers:
+  - url: https://YOUR_PROJECT.supabase.co/functions/v1
+security: []
+paths:
+  /join-session:
+    post:
+      operationId: joinSession
+      summary: Join a learning session
+      security: []
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/JoinSessionRequest' } } } }
+      responses:
+        '200': { description: Joined or replayed, content: { application/json: { schema: { $ref: '#/components/schemas/JoinSessionResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /groups:
+    post:
+      operationId: createGroup
+      summary: Create a group
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateGroupRequest' } } } }
+      responses:
+        '201': { description: Created or replayed, content: { application/json: { schema: { $ref: '#/components/schemas/Group' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /content-pack:
+    get:
+      operationId: getContentPack
+      summary: Get published session content
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: session_id, in: query, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+      responses:
+        '200': { description: Content pack, content: { application/json: { schema: { $ref: '#/components/schemas/ContentPack' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /assistant/ask:
+    post:
+      operationId: askAssistant
+      summary: Match intent and return a controlled response
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AskRequest' } } } }
+      responses:
+        '200': { description: Assistant result, content: { application/json: { schema: { $ref: '#/components/schemas/AskResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /observations/{id}:
+    put:
+      operationId: updateObservation
+      summary: Replace a group observation using optimistic concurrency
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/ResourceId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ObservationUpdate' } } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/VersionedResource' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/VersionConflict' }
+  /missions/start:
+    post: { $ref: '#/components/pathItems/MissionStart' }
+  /missions/complete:
+    post: { $ref: '#/components/pathItems/MissionComplete' }
+  /investigation/submit:
+    post:
+      operationId: submitInvestigation
+      summary: Submit the group investigation
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/InvestigationSubmit' } } } }
+      responses: { '200': { description: Submitted, content: { application/json: { schema: { $ref: '#/components/schemas/VersionedResource' } } } }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/VersionConflict' } }
+  /stations/start:
+    post:
+      operationId: startStation
+      summary: Start a station attempt
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/StationStart' } } } }
+      responses: { '201': { description: Started, content: { application/json: { schema: { $ref: '#/components/schemas/StationAttempt' } } } }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /stations/attempts/{attemptId}/answers/{questionId}:
+    put:
+      operationId: saveAnswer
+      summary: Save an answer using optimistic concurrency
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/AttemptId' }, { $ref: '#/components/parameters/QuestionId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AnswerUpdate' } } } }
+      responses: { '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/VersionedResource' } } } }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/VersionConflict' } }
+  /stations/attempts/{attemptId}/submit:
+    post:
+      operationId: submitStationAttempt
+      summary: Submit a station attempt
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/AttemptId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '200': { description: Submitted, content: { application/json: { schema: { $ref: '#/components/schemas/StationAttempt' } } } }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /teacher/sessions/{sessionId}/overview:
+    get:
+      operationId: getTeacherSessionOverview
+      summary: Get an owned session overview
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      responses: { '200': { description: Overview, content: { application/json: { schema: { type: object, required: [session_id, groups], properties: { session_id: { $ref: '#/components/schemas/Uuid' }, groups: { type: array, items: { $ref: '#/components/schemas/Group' } } } } } } }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /teacher/answers/{answerId}/review:
+    post:
+      operationId: reviewAnswer
+      summary: Review an answer in the teacher's own session
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: answerId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AnswerReview' } } } }
+      responses: { '200': { description: Reviewed, content: { application/json: { schema: { $ref: '#/components/schemas/VersionedResource' } } } }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/VersionConflict' } }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    IdempotencyKey: { name: Idempotency-Key, in: header, required: true, description: UUID reused for an identical retry; reuse with a different payload returns 409., schema: { type: string, format: uuid } }
+    ResourceId: { name: id, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+    AttemptId: { name: attemptId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+    QuestionId: { name: questionId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+    SessionId: { name: sessionId, in: path, required: true, schema: { $ref: '#/components/schemas/Uuid' } }
+  pathItems:
+    MissionStart:
+      operationId: startMission
+      summary: Start group mission progress
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/MissionMutation' } } } }
+      responses: { '200': { description: Started, content: { application/json: { schema: { $ref: '#/components/schemas/VersionedResource' } } } }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/VersionConflict' } }
+    MissionComplete:
+      operationId: completeMission
+      summary: Complete group mission progress
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/MissionMutation' } } } }
+      responses: { '200': { description: Completed, content: { application/json: { schema: { $ref: '#/components/schemas/VersionedResource' } } } }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/VersionConflict' } }
+  responses:
+    BadRequest: { description: Invalid request, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Unauthorized: { description: Missing or invalid JWT, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden: { description: Resource is outside the caller's group/session, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    NotFound: { description: Resource not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Conflict: { description: Idempotency or state conflict, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    VersionConflict: { description: base_version is stale; fetch latest state and retry, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  schemas:
+    Uuid: { type: string, format: uuid }
+    Error: { type: object, required: [code, message], properties: { code: { type: string, examples: [version_conflict] }, message: { type: string }, details: { type: object, additionalProperties: true } } }
+    VersionedResource: { type: object, required: [id, version], properties: { id: { $ref: '#/components/schemas/Uuid' }, version: { type: integer, minimum: 1 } } }
+    JoinSessionRequest: { type: object, additionalProperties: false, required: [join_code, display_name, installation_id], properties: { join_code: { type: string, pattern: '^[A-Z0-9-]{4,16}$' }, display_name: { type: string, minLength: 1, maxLength: 80 }, installation_id: { $ref: '#/components/schemas/Uuid' } } }
+    JoinSessionResponse: { type: object, required: [session_id, group_id], properties: { session_id: { $ref: '#/components/schemas/Uuid' }, group_id: { $ref: '#/components/schemas/Uuid' }, access_token: { type: string } } }
+    GroupMember: { type: object, required: [display_name], properties: { display_name: { type: string, minLength: 1, maxLength: 80 } } }
+    CreateGroupRequest: { type: object, required: [session_id, name, members], properties: { session_id: { $ref: '#/components/schemas/Uuid' }, name: { type: string, minLength: 1 }, members: { type: array, minItems: 1, items: { $ref: '#/components/schemas/GroupMember' } } } }
+    Group: { type: object, required: [id, session_id, name], properties: { id: { $ref: '#/components/schemas/Uuid' }, session_id: { $ref: '#/components/schemas/Uuid' }, name: { type: string } } }
+    ContentPack: { type: object, required: [content_version, missions, intent_rules, responses, ar_sequences, stations, questions, assets], properties: { content_version: { type: string }, missions: { type: array, items: { type: object } }, intent_rules: { type: array, items: { type: object } }, responses: { type: array, items: { type: object } }, ar_sequences: { type: array, items: { type: object } }, stations: { type: array, items: { type: object } }, questions: { type: array, items: { type: object } }, assets: { type: array, items: { type: object } } } }
+    AskRequest: { type: object, required: [session_id, group_id, mission_code, question_text, input_mode], properties: { session_id: { $ref: '#/components/schemas/Uuid' }, group_id: { $ref: '#/components/schemas/Uuid' }, mission_code: { type: string }, question_text: { type: string, minLength: 1 }, input_mode: { type: string, enum: [text, voice] } } }
+    AskResponse: { type: object, required: [intent, confidence, response_text], properties: { intent: { type: string }, confidence: { type: number, minimum: 0, maximum: 1 }, response_text: { type: string }, analysis_prompt: { type: string }, ar_sequence_code: { type: string } } }
+    ObservationUpdate: { type: object, required: [base_version, sample_ref], properties: { base_version: { type: integer, minimum: 1 }, sample_ref: { type: string }, detected_structure: { type: string }, structure_state: { type: string }, function_analysis: { type: string }, damage_impact: { type: string } } }
+    MissionMutation: { type: object, required: [group_id, mission_id, base_version], properties: { group_id: { $ref: '#/components/schemas/Uuid' }, mission_id: { $ref: '#/components/schemas/Uuid' }, base_version: { type: integer, minimum: 1 } } }
+    InvestigationSubmit: { type: object, required: [group_id, base_version], properties: { group_id: { $ref: '#/components/schemas/Uuid' }, base_version: { type: integer, minimum: 1 }, sample_a_identity: { type: string }, sample_a_reasoning: { type: string }, sample_b_identity: { type: string }, sample_b_reasoning: { type: string }, group_hypothesis: { type: string } } }
+    StationStart: { type: object, required: [group_id, station_id], properties: { group_id: { $ref: '#/components/schemas/Uuid' }, station_id: { $ref: '#/components/schemas/Uuid' } } }
+    StationAttempt: { type: object, required: [id, status, started_at, expires_at], properties: { id: { $ref: '#/components/schemas/Uuid' }, status: { type: string, enum: [active, submitted, expired] }, started_at: { type: string, format: date-time }, expires_at: { type: string, format: date-time } } }
+    AnswerUpdate: { type: object, required: [base_version, answer_text], properties: { base_version: { type: integer, minimum: 1 }, answer_text: { type: string } } }
+    AnswerReview: { type: object, required: [base_version, teacher_score], properties: { base_version: { type: integer, minimum: 1 }, teacher_score: { type: number, minimum: 0 }, feedback: { type: string } } }

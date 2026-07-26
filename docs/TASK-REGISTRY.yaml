@@ -1,0 +1,440 @@
+project: cell-forensic
+version: "3.0-flutter"
+stack:
+  mobile: flutter
+  dashboard: flutter_web
+  backend: supabase
+  ar: ar_flutter_plugin_2_with_model_viewer_fallback
+
+epics:
+  - id: E0
+    title: Asset Audit and Flutter AR Spike
+    status: done
+    notes: 21 GLB inventoried (not 30); renderer = ar_flutter_plugin_2 + model_viewer_plus; see docs/E0_AR_SPIKE_REPORT.md
+    tasks:
+      - id: E0-01
+        title: Inventory all 30 assets
+        status: done
+        notes: 21 GLB on disk; docs/asset_inventory.csv + lib/ar/ar_asset_manifest.dart
+      - id: E0-02
+        title: Audit format texture polygon node pivot and animation
+        status: done
+        notes: 16 ready / 5 fix; 0 animation clips; docs/10_ASSET_INVENTORY_AUDIT.md
+      - id: E0-03
+        title: Initialize Flutter AR spike
+        status: done
+        notes: ar_flutter_plugin_2, minSdk 28, MissionScenePanel
+      - id: E0-04
+        title: Test Flutter AR plugin capabilities
+        status: done
+        notes: plane+anchor+GLB pass; anim/marker/particle fail or missing
+      - id: E0-05
+        title: Build native Android AR bridge spike if required
+        status: deferred
+        notes: Not required — plugin path accepted for MVP; reopen if device matrix fails
+      - id: E0-06
+        title: Test fallback 3D renderer
+        status: done
+        notes: model_viewer_plus with shared SequenceEngine
+      - id: E0-07
+        title: Choose final AR renderer
+        status: done
+        notes: Final = Flutter AR plugin + Model Viewer fallback
+      - id: E0-08
+        title: Validate organelle X Y and membrane labels
+        status: done
+        notes: Semantic A-labels validated; X/Y and membrane 1/2 stay provisional
+
+  - id: E1
+    title: Flutter Foundation
+    status: done
+    notes: mobile+dashboard entrypoints, tokens, Supabase, persistent LocalStore/SyncQueue, CI+flavors
+    tasks:
+      - id: E1-01
+        title: Initialize Flutter mobile app
+        status: done
+        notes: lib/main.dart + main_mobile.dart; Android label Cell Forensic
+      - id: E1-02
+        title: Initialize Flutter web dashboard
+        status: done
+        notes: main_dashboard.dart loads active sessions/groups from Supabase
+      - id: E1-03
+        title: Configure shared models and design tokens
+        status: done
+        notes: lib/shared/design_tokens.dart + domain/entities.dart
+      - id: E1-04
+        title: Configure Supabase
+        status: done
+        notes: schema+seed CELL01 applied; Flutter supabase_flutter wired with offline fallback
+      - id: E1-05
+        title: Configure local database and sync queue
+        status: done
+        notes: SharedPreferencesStorageBackend + SupabaseRemoteSyncClient via AppServices
+      - id: E1-06
+        title: Configure CI environments and flavors
+        status: done
+        notes: .github/workflows/ci.yml + AppFlavor dart-define
+
+  - id: E2
+    title: Session and Group
+    status: done
+    notes: Join by code + group create/members wired into JourneyHost; LocalDatabase persistence; see docs/E2_SESSION_GROUP.md
+    tasks:
+      - id: E2-01
+        title: Join learning session
+        status: done
+        notes: JoinGroupScreen join-code step; local CELL01 + RemoteSessionService.findActiveSession fallback
+      - id: E2-02
+        title: Create group
+        status: done
+        notes: PersistedSessionRepository.createGroup + optional remote register; journey groupSetup
+      - id: E2-03
+        title: Manage group members
+        status: done
+        notes: Add member + promote leader (exactly one leader) in JoinGroupScreen
+      - id: E2-04
+        title: Persist session offline
+        status: done
+        notes: PersistedSessionRepository + SessionSnapshotStore restore on JourneyHost relaunch
+
+  - id: E3
+    title: AR Investigation
+    status: done
+    notes: Plane scan+place, ArSceneEngine Fake/Live, SequenceEngine wired to missions 1–3, tracking pause, Model Viewer fallback; see docs/E3_AR_INVESTIGATION.md
+    tasks:
+      - id: E3-01
+        title: Surface scan and placement
+        status: done
+        notes: ArScanPhase scanning→planeReady→placed in MissionScenePanel; tap plane places GLB
+      - id: E3-02
+        title: Implement ArSceneEngine
+        status: done
+        notes: ControllableArSceneEngine + Fake/Live; MissionScreen owns engine (FR-121)
+      - id: E3-03
+        title: Implement sequence engine
+        status: done
+        notes: SequenceEngine + ArAssetRegistry.modelForStep; runAction per step
+      - id: E3-04
+        title: Implement Mission 1
+        status: done
+        notes: MISI-1 content + Sampel A / solo organelle assets
+      - id: E3-05
+        title: Implement Mission 2
+        status: done
+        notes: MISI-2 membrane + RantaiProtein steps
+      - id: E3-06
+        title: Implement Mission 3
+        status: done
+        notes: MISI-3 compare outer layers + dinding sel / Sampel B
+      - id: E3-07
+        title: Implement tracking recovery
+        status: done
+        notes: updateTracking lost pauses sequence; overlay + resume (FR-025)
+      - id: E3-08
+        title: Implement fallback 3D
+        status: done
+        notes: model_viewer_plus shares SequenceEngine; no plane required (FR-124)
+
+  - id: E4
+    title: AI and Digital LKPD
+    status: done
+    notes: IntentMatcher chat + controlled hints, logbook autosave, InvestigationSync, conclusion draft/submit; see docs/E4_AI_LKPD.md
+    tasks:
+      - id: E4-01
+        title: Build Flutter assistant chat
+        status: done
+        notes: MissionScreen asisten panel + AssistantView/ViewModel
+      - id: E4-02
+        title: Implement deterministic Dart intent matcher
+        status: done
+        notes: IntentMatcher keyword AND-match; separate unknown / off_topic / provisional
+      - id: E4-03
+        title: Implement controlled responses and hints
+        status: done
+        notes: Per-mission IntentRule + request_hint; blocks Organel X/Y & membran 1/2 inventions
+      - id: E4-04
+        title: Implement observation logbook
+        status: done
+        notes: Mission logbook prompts bound to StudentJourney.logbookByMission
+      - id: E4-05
+        title: Implement autosave and sync
+        status: done
+        notes: Local snapshot + InvestigationSync enqueue when remoteGroupId set
+      - id: E4-06
+        title: Implement conclusions and hypothesis
+        status: done
+        notes: ConclusionScreen draft autosave + required-field submit
+
+  - id: E5
+    title: Evaluation Stations
+    status: done
+    notes: Marker+PIN, POS 1–3, timer/rotasi, snapshot autosave; see docs/E5_EVALUATION_STATIONS.md
+    tasks:
+      - id: E5-01
+        title: Implement marker and PIN access
+        status: done
+        notes: Simulated marker scan + PIN fallback FR-092; MARKER-POS-1/2/3
+      - id: E5-02
+        title: Implement POS 1
+        status: done
+        notes: Identifikasi struktur; pin 1111; questions POS1-Q1/Q2
+      - id: E5-03
+        title: Implement POS 2
+        status: done
+        notes: Analisis kerusakan; pin 2222; questions POS2-Q1/Q2
+      - id: E5-04
+        title: Implement POS 3
+        status: done
+        notes: Kesimpulan forensik; pin 3333; questions POS3-Q1/Q2
+      - id: E5-05
+        title: Implement timer and rotation
+        status: done
+        notes: 300s countdown + expiresAt restore; rotate POS 1→2→3; lock on expiry
+      - id: E5-06
+        title: Implement station autosave and submission
+        status: done
+        notes: Snapshot answers/index/unlock; StationSync enqueue; submittedStationCodes
+
+  - id: E6
+    title: Flutter Web Teacher Dashboard
+    status: done
+    notes: Session overview, group detail, ScoringEngine review, CSV export; see docs/E6_TEACHER_DASHBOARD.md
+    tasks:
+      - id: E6-01
+        title: Build session overview
+        status: done
+        notes: DashboardHome loads active sessions/groups + pending review count
+      - id: E6-02
+        title: Build group detail
+        status: done
+        notes: GroupDetailScreen — members, mission progress, conclusion, answers
+      - id: E6-03
+        title: Build review and scoring
+        status: done
+        notes: ScoringEngine auto-score + teacher review sheet with optimistic version
+      - id: E6-04
+        title: Build CSV export
+        status: done
+        notes: DashboardCsvExporter + web download / clipboard fallback
+
+  - id: E7
+    title: Security QA and Pilot
+    status: partial
+    notes: >
+      RLS tightened to active-session scope; lifecycle harness + docs shipped;
+      device matrix / pilot are checklists pending physical classroom run;
+      release scripts + workflow_dispatch artifacts ready.
+      Teacher auth + join RPC + session CRUD policies landed in E9
+      (supersedes E7 residual “no teacher JWT”).
+      E10 privilege hardening applied (keys/scores/TRUNCATE); residual remains
+      session-wide anon R/W on active-session student tables.
+      See docs/E7_RLS_SECURITY.md, E7_LIFECYCLE_QA.md, E7_DEVICE_MATRIX.md,
+      E7_PILOT_RUNBOOK.md, E7_RELEASE.md, E9_TEACHER_AUTH.md,
+      TASK-REGISTRY E10.
+    tasks:
+      - id: E7-01
+        title: Implement and test RLS
+        status: done
+        notes: >
+          Migrations e7_tighten_active_session_rls + e7_rls_helpers_security_invoker;
+          anon join CELL01 verified; rls_policy_always_true cleared;
+          residual session-wide anon access + join_active_session DEFINER WARN
+          documented in docs/E7_RLS_SECURITY.md
+      - id: E7-02
+        title: Test Flutter lifecycle and native channel
+        status: done
+        notes: >
+          ArLifecycleController + MissionScenePanel observer;
+          unit tests in test/ar/ar_lifecycle_controller_test.dart;
+          native AR channel matrix documented (CI-limited) in docs/E7_LIFECYCLE_QA.md
+      - id: E7-03
+        title: Run device matrix
+        status: checklist
+        notes: >
+          Tier A/B/C matrix + acceptance checklist in docs/E7_DEVICE_MATRIX.md;
+          physical ARCore/fleet runs not executable in CI — facilitator must tick boxes
+      - id: E7-04
+        title: Run classroom pilot
+        status: checklist
+        notes: >
+          Runbook + observer checklist in docs/E7_PILOT_RUNBOOK.md;
+          result log TBD after live class
+      - id: E7-05
+        title: Release Android build and Flutter Web dashboard
+        status: done
+        notes: >
+          scripts/release_android.sh + scripts/release_web_dashboard.sh;
+          CI workflow_dispatch release_artifacts job; docs/E7_RELEASE.md
+  - id: E8
+    title: Final Acceptance and Handover
+    status: done
+    notes: >
+      Acceptance matrix + smoke regression hijau; handover docs shipped;
+      no code pilot blockers; E7-03/E7-04 physical checklists remain ops.
+      Teacher auth gap closed by E9 (update index/handover accordingly).
+      See docs/E8_ACCEPTANCE.md, docs/E8_HANDOVER.md, docs/E9_TEACHER_AUTH.md.
+    tasks:
+      - id: E8-01
+        title: Verify all requirements against original documents
+        status: done
+        notes: >
+          MVP wajib + FR/NFR matrix in docs/E8_ACCEPTANCE.md;
+          E9 supersedes prior teacher-JWT gap (FR-001/003 OK);
+          remaining partials: admin CMS, native particle/anim, session-wide anon RLS
+      - id: E8-02
+        title: Fix pilot blockers and final bugs
+        status: done
+        notes: >
+          No critical code blockers from analyze/smoke;
+          remaining items are E7 device matrix / classroom pilot ops
+      - id: E8-03
+        title: Run final regression test
+        status: done
+        notes: >
+          dart analyze clean; 40-test smoke subset passed 2026-07-26;
+          commands recorded in docs/E8_ACCEPTANCE.md
+      - id: E8-04
+        title: Prepare user and deployment documentation
+        status: done
+        notes: >
+          docs/E8_HANDOVER.md + README.md pointer; no service_role in client docs
+      - id: E8-05
+        title: Final handover and project sign-off
+        status: done
+        notes: >
+          Engineering/security sign-off with residual RLS;
+          teacher auth shipped in E9; product go-live still pending
+          E7-03/E7-04 facilitator ticks
+
+  - id: E9
+    title: Teacher Auth and Session Lifecycle
+    status: done
+    notes: >
+      Teacher email/password + profiles.role gate; dashboard create/activate/close
+      sessions; student join via join_active_session RPC; teacher RLS for mutations.
+      See docs/E9_TEACHER_AUTH.md.
+    tasks:
+      - id: E9-01
+        title: Teacher email/password auth for dashboard
+        status: done
+        notes: >
+          TeacherAuthGate + SupabaseTeacherAuthService; authz from profiles.role
+          (never user_metadata); promote_user_to_teacher SQL helper
+      - id: E9-02
+        title: Create and activate learning sessions from dashboard
+        status: done
+        notes: >
+          CreateSessionDialog + Aktifkan/Tutup Sesi; teacher_id = auth.uid()
+      - id: E9-03
+        title: Prefer join_active_session RPC and lock closed sessions
+        status: done
+        notes: >
+          RemoteSessionService.rpc first; anon group INSERT policies dropped;
+          status != active blocks student writes
+      - id: E9-04
+        title: Teacher RLS policies and advisors
+        status: done
+        notes: >
+          Migrations e9_teacher_auth_session_rls + e9_fix_teacher_helpers_grants;
+          CELL01 join verified; residual session-wide anon on active tables
+      - id: E9-05
+        title: Docs and auth-gated dashboard tests
+        status: done
+        notes: >
+          docs/E9_TEACHER_AUTH.md; test/app/dashboard_auth_gate_test.dart
+
+  - id: E10
+    title: Harden Privileges Beyond RLS
+    status: done
+    notes: >
+      Column/table privilege hardening applied remotely + mirrored migration
+      20260726120000_e10_security_harden_privileges.sql. Anon cannot read
+      question keys/rubrics or write teacher scores; join stays RPC-only;
+      helpers moved to private schema. Flutter clients: dashboard requires
+      teacher JWT for key SELECT; student answer sync strips teacher columns.
+      Residual: session-wide anon R/W on active-session student tables (E7).
+      See docs/E7_RLS_SECURITY.md (E10 section), docs/E9_TEACHER_AUTH.md.
+    tasks:
+      - id: E10-01
+        title: Apply privilege hardening migration
+        status: done
+        notes: >
+          Revoke TRUNCATE; questions column SELECT for anon without
+          correct_answer/rubric; answers column UPDATE without teacher
+          score fields; revoke direct groups/group_members INSERT;
+          private.is_teacher_or_admin / private.is_session_teacher
+      - id: E10-02
+        title: Align Flutter clients with E10 privileges
+        status: done
+        notes: >
+          DashboardSessionRepository requires auth for key loads / review;
+          StudentAnswerPayload + StationSync + SupabaseRemoteSyncClient
+          write only allowed answer columns; join_active_session unchanged
+      - id: E10-03
+        title: Register residual pilot risks
+        status: done
+        notes: >
+          Session-wide anon R/W on active tables remains; join-code spam
+          via DEFINER RPC; CELL01 teacher_id null read-only on dashboard;
+          sync DELETE still fails (privilege revoked)
+
+  - id: E11
+    title: Live AR Upgrades and OpenAI-Compatible AI Integration
+    status: done
+    notes: >
+      Registered as E11 because E10 is security harden. User label “E10 AR+AI”
+      → see docs/E11_AR_AI_INTEGRATION.md. Live AR keeps plane anchor across
+      M1–M3; model_viewer_plus fallback only; ArSceneEngine visual APIs;
+      Edge Function ai-assistant proxy (no client OPENAI_API_KEY);
+      IntentMatcher offline fallback; whitelist ar_action. Physical ARCore
+      matrix remains facilitator checklist (E7-03).
+    tasks:
+      - id: E11-01
+        title: Audit AR path and prevent false fallback
+        status: done
+        notes: >
+          Soft fallback only on fatal init failure before place; successful
+          place keeps Live ARView + GlobalKey; tests cover place vs force-fallback
+      - id: E11-02
+        title: Persist active AR anchor across sequence steps
+        status: done
+        notes: >
+          replaceModelAtActiveAnchor on same ARPlaneAnchor; no separate viewer
+          page; secondary node for M3 side-by-side
+      - id: E11-03
+        title: Extend ArSceneEngine visual command surface
+        status: done
+        notes: >
+          show/hide/scale/rotate/position/highlight/opacity/replace/reset/
+          overlay + secondary model on Controllable/Fake/Live
+      - id: E11-04
+        title: M1–M3 visual upgrades on live scene
+        status: done
+        notes: >
+          ArVisualDirector + Flutter overlays (glow/leak/arrows/labels);
+          GLB swaps from ArAssetRegistry; plugin particle/anim gaps documented
+      - id: E11-05
+        title: Gestures without breaking sequence/lifecycle
+        status: done
+        notes: >
+          Scale/rotate/reset transform/structure tap/reposition; gated when
+          sequencePaused; lifecycle resume gates preserved
+      - id: E11-06
+        title: OpenAI-compatible AI via secure Edge proxy
+        status: done
+        notes: >
+          supabase/functions/ai-assistant; structured JSON; whitelist;
+          mission/confidence gates; IntentMatcher fallback; secrets only
+          in Supabase dashboard (OPENAI_API_KEY / BASE_URL / MODEL)
+      - id: E11-07
+        title: Wire assistant → whitelist → ArSceneEngine
+        status: done
+        notes: >
+          MissionScreen + AssistantViewModel; provisional Organel X/Y and
+          membran 1/2 still blocked locally and in proxy
+      - id: E11-08
+        title: Tests analyze and docs
+        status: done
+        notes: >
+          flutter test 209 passed; docs/E11_AR_AI_INTEGRATION.md + README
+          pointer; physical device ticks remain E7-03
