@@ -1,6 +1,7 @@
 import 'package:cell_forensic/ar/ar_asset_registry.dart';
 import 'package:cell_forensic/ar/ar_scene_engine.dart';
 import 'package:cell_forensic/ar/ar_visual_director.dart';
+import 'package:cell_forensic/ar/misi2_visual_helpers.dart';
 import 'package:cell_forensic/domain/ai/ar_action_whitelist.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -138,5 +139,64 @@ void main() {
     expect(fake.visualState.overlay, ArOverlayEffect.waterLeak);
     expect(fake.visualState.userScale, 1);
     await fake.dispose();
+  });
+
+  test('M2 SEQ-MISI-2: normal bilayer then torn + membrane-anchored leak',
+      () async {
+    await engine.place(const ArPlacement(x: 0.2, y: 0, z: -1.1));
+    await engine.initLabScene(
+      labTableModelPath: ArAssetRegistry.mejaLab,
+      sampleAModelPath: ArAssetRegistry.sampleA,
+      sampleBModelPath: ArAssetRegistry.sampleB,
+    );
+    final placement = engine.placement;
+
+    await director.applySequenceStep(
+      engine,
+      missionCode: 'MISI-2',
+      stepCode: 'focus_sample_b',
+    );
+    expect(engine.placement, placement);
+    expect(engine.visualState.activeModelPath, ArAssetRegistry.sampleB);
+    expect(engine.visualState.secondaryModelPath, isNull);
+    expect(engine.visualState.highlightTarget, ArNodeIds.membrane);
+    expect(engine.visualState.overlay, ArOverlayEffect.none);
+    expect(engine.visualState.labTableModelPath, ArAssetRegistry.mejaLab);
+
+    await director.applySequenceStep(
+      engine,
+      missionCode: 'MISI-2',
+      stepCode: 'zoom_membrane',
+    );
+    // Intact zoom — no damage ring yet (normal before torn).
+    expect(engine.placement, placement);
+    expect(engine.visualState.activeModelPath, ArAssetRegistry.sampleB);
+    expect(engine.visualState.overlay, ArOverlayEffect.none);
+    expect(
+      engine.visualState.nodeScale[ArNodeIds.primary],
+      Misi2VisualHelpers.bilayerZoomScale,
+    );
+    expect(engine.visualState.highlightTarget, ArNodeIds.membrane);
+
+    await director.applySequenceStep(
+      engine,
+      missionCode: 'MISI-2',
+      stepCode: 'show_torn_bilayer',
+    );
+    expect(engine.placement, placement);
+    expect(engine.visualState.activeModelPath, ArAssetRegistry.rantaiProtein);
+    expect(engine.visualState.overlay, ArOverlayEffect.membraneDamage);
+
+    await director.applySequenceStep(
+      engine,
+      missionCode: 'MISI-2',
+      stepCode: 'play_leak_particles',
+    );
+    expect(engine.placement, placement);
+    expect(engine.visualState.activeModelPath, ArAssetRegistry.rantaiProtein);
+    expect(engine.visualState.overlay, ArOverlayEffect.waterLeak);
+    // Membrane highlight anchors the dark-blue spray (not fullscreen).
+    expect(engine.visualState.highlightTarget, ArNodeIds.membrane);
+    expect(engine.visualState.labTableModelPath, ArAssetRegistry.mejaLab);
   });
 }

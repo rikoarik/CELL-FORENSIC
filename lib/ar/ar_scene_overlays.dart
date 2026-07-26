@@ -70,9 +70,14 @@ class _ArOverlayPainter extends CustomPainter {
       case ArOverlayEffect.membraneDamage:
         _dashedRing(canvas, center, modelRadius, const Color(0xFFEF4444));
       case ArOverlayEffect.waterLeak:
-        _waterDrops(
+        // PDF Misi 2: dark-blue water spheres spray OUT from the membrane
+        // region — not a fullscreen particle field.
+        final membraneOrigin = highlightTarget == ArNodeIds.membrane
+            ? center.translate(0, -modelRadius * 0.05)
+            : center.translate(0, modelRadius * 0.05);
+        _membraneWaterSpray(
           canvas,
-          center.translate(0, modelRadius * 0.2),
+          membraneOrigin,
           modelRadius,
         );
       case ArOverlayEffect.cellWallHighlight:
@@ -114,6 +119,46 @@ class _ArOverlayPainter extends CustomPainter {
         const Color(0xFF22C55E),
       );
     }
+    if (highlightTarget == ArNodeIds.membrane &&
+        effect != ArOverlayEffect.membraneDamage &&
+        effect != ArOverlayEffect.waterLeak) {
+      _dashedRing(
+        canvas,
+        center,
+        modelRadius * 0.95,
+        const Color(0xFF60A5FA),
+      );
+    }
+  }
+
+  /// Dark-blue (#1E3A8A family) droplets exiting radially from the membrane
+  /// rim — kept inside ~1.4× model radius so the spray stays tabletop-local.
+  void _membraneWaterSpray(Canvas canvas, Offset membraneCenter, double r) {
+    const darkBlue = Color(0xFF1E3A8A);
+    final fill = Paint()..color = darkBlue.withValues(alpha: 0.88);
+    final rim = Paint()
+      ..color = const Color(0xFF1E40AF).withValues(alpha: 0.55)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    // Soft membrane rim so particles read as "from membrane", not HUD-wide.
+    canvas.drawCircle(membraneCenter, r * 0.92, rim);
+
+    const count = 14;
+    for (var i = 0; i < count; i++) {
+      final t = i / count;
+      final angle = -math.pi * 0.15 + t * math.pi * 1.3;
+      final dist = r * (0.95 + (i % 4) * 0.12);
+      final pos = membraneCenter.translate(
+        math.cos(angle) * dist,
+        math.sin(angle) * dist + r * 0.08 * (i % 3),
+      );
+      final size = 5.0 + (i % 4);
+      canvas.drawOval(
+        Rect.fromCenter(center: pos, width: size, height: size * 1.35),
+        fill,
+      );
+    }
   }
 
   void _glow(Canvas canvas, Offset c, double r, Color color) {
@@ -151,23 +196,6 @@ class _ArOverlayPainter extends CustomPainter {
         paint,
       );
       angle = next + gap / r;
-    }
-  }
-
-  void _waterDrops(Canvas canvas, Offset origin, double r) {
-    final paint = Paint()
-      ..color = const Color(0xFF38BDF8).withValues(alpha: 0.75);
-    for (var i = 0; i < 6; i++) {
-      final dx = (i - 2.5) * r * 0.18;
-      final dy = i * r * 0.16;
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: origin.translate(dx, dy),
-          width: 6 + (i % 3).toDouble(),
-          height: 10 + (i % 2) * 3,
-        ),
-        paint,
-      );
     }
   }
 

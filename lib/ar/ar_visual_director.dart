@@ -1,5 +1,6 @@
 import 'package:cell_forensic/ar/ar_asset_registry.dart';
 import 'package:cell_forensic/ar/ar_scene_engine.dart';
+import 'package:cell_forensic/ar/misi2_visual_helpers.dart';
 import 'package:cell_forensic/domain/ai/ar_action_whitelist.dart';
 
 /// Applies mission sequence steps and whitelisted AI AR actions onto an
@@ -64,21 +65,17 @@ class ArVisualDirector {
         await engine.setOpacity(0.85);
         await engine.showAnchoredOverlayEffect(ArOverlayEffect.vacuoleDamage);
       case ('MISI-2', 'focus_sample_b'):
-        await engine.setSecondaryModel(null);
-        await engine.setMaterialHighlight(ArNodeIds.membrane, enabled: true);
-        await engine.showAnchoredOverlayEffect(ArOverlayEffect.none);
+        // PDF: focus lapisan terluar Sampel B — stay on lab tabletop.
+        await Misi2VisualHelpers.focusSampleBOuter(engine);
       case ('MISI-2', 'zoom_membrane'):
-        await engine.setNodeScale(
-          ArNodeIds.primary,
-          const ArVec3(1.2, 1.2, 1.2),
-        );
-        await engine.setMaterialHighlight(ArNodeIds.membrane, enabled: true);
-        await engine.showAnchoredOverlayEffect(ArOverlayEffect.membraneDamage);
+        // PDF: zoom bilayer intact first (normal), damage comes next step.
+        await Misi2VisualHelpers.zoomIntactBilayer(engine);
       case ('MISI-2', 'show_torn_bilayer'):
-        await engine.setMaterialHighlight(ArNodeIds.membrane, enabled: true);
-        await engine.showAnchoredOverlayEffect(ArOverlayEffect.membraneDamage);
+        // PDF: ekor fosfolipid terputus-putus (RantaiProtein proxy).
+        await Misi2VisualHelpers.showTornBilayer(engine);
       case ('MISI-2', 'play_leak_particles'):
-        await engine.showAnchoredOverlayEffect(ArOverlayEffect.waterLeak);
+        // PDF: partikel air biru tua menyembur dari area membran (bukan fullscreen).
+        await Misi2VisualHelpers.playMembraneLeakParticles(engine);
       case ('MISI-3', 'show_both_samples'):
         await engine.replaceModelAtActiveAnchor(ArAssetRegistry.sampleA);
         await engine.setSecondaryModel(

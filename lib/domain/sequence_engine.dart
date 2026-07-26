@@ -83,17 +83,17 @@ abstract final class SequenceStepCodes {
   /// Deflate the giant vacuole (vacuole-damage overlay).
   static const playShrinkAnimation = 'play_shrink_animation';
 
-  // --- Misi 2: investigate Sample B membrane ---
-  /// Focus Sample B outer layer / membrane.
+  // --- Misi 2: investigate Sample B membrane (PDF Scene 2) ---
+  /// Focus Sample B outer layer / membrane (tabletop, no re-place).
   static const focusSampleB = 'focus_sample_b';
 
-  /// Zoom into the phospholipid bilayer.
+  /// Zoom into the phospholipid bilayer while still **intact** (normal).
   static const zoomMembrane = 'zoom_membrane';
 
-  /// Show the torn bilayer (broken hydrophobic tails).
+  /// Show the **torn** bilayer (broken hydrophobic tails / RantaiProtein proxy).
   static const showTornBilayer = 'show_torn_bilayer';
 
-  /// Blue water particles leaking out of the cell.
+  /// Dark-blue water particles exiting from the membrane area (anchored overlay).
   static const playLeakParticles = 'play_leak_particles';
 
   // --- Misi 3: compare outer layers of A and B ---
@@ -132,8 +132,11 @@ abstract final class MissionSequences {
     ],
   );
 
-  /// Misi 2 — focus B outer → zoom bilayer → torn bilayer → blue water
-  /// particles leaking out.
+  /// Misi 2 — focus B outer → zoom **intact** bilayer → **torn** bilayer →
+  /// dark-blue water particles spraying out from the membrane area (PDF).
+  ///
+  /// Order is intentional: students see the normal bilayer close-up before the
+  /// torn state, then the leak particles. All beats stay on the lab tabletop.
   static const misi2 = SequenceConfig(
     code: 'SEQ-MISI-2',
     steps: [
