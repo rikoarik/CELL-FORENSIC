@@ -40,6 +40,9 @@ class SupabaseAiAssistantClient implements AiAssistantClient {
     );
 
     final data = response.data;
+    if (data is Map && data['error'] != null) {
+      throw StateError(data['error'].toString());
+    }
     final parsed = AiAssistantResponse.tryParse(data);
     if (parsed == null) {
       throw FormatException('Respons AI tidak valid');

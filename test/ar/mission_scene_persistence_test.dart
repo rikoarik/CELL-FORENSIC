@@ -50,7 +50,7 @@ void main() {
     expect(engine.visualState.labTableModelPath, ArAssetRegistry.mejaLab);
     expect(engine.visualState.activeModelPath, ArAssetRegistry.sampleA);
     expect(engine.visualState.secondaryModelPath, ArAssetRegistry.sampleB);
-    expect(engine.visualState.overlay, ArOverlayEffect.comparisonLabels);
+    expect(engine.visualState.overlay, ArOverlayEffect.none);
     expect(
       tester.widget<Text>(find.byKey(const Key('mission-mode-label'))).data,
       'Mode AR (Kamera)',

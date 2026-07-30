@@ -266,6 +266,18 @@ class StudentJourney extends ChangeNotifier {
     _transition(JourneyStage.investigating);
   }
 
+  /// Clears the current group so the student can create / pick a new one.
+  ///
+  /// Keeps the joined session code. Soft — does not wipe mission progress.
+  void clearGroup() {
+    _group = null;
+    _groupName = null;
+    _leaderName = null;
+    _remoteGroupId = null;
+    _clearError();
+    notifyListeners();
+  }
+
   /// Joins the local session and registers the group in one step.
   ///
   /// Convenience for tests and legacy callers; the live UI uses
@@ -493,9 +505,9 @@ class StudentJourney extends ChangeNotifier {
     _transition(JourneyStage.investigating);
   }
 
-  /// Marks Scene 1 lab placement complete → all three missions `available`.
+  /// Marks lab placement complete → unlock missions and start Misi 1.
   ///
-  /// Does not start Misi 1. No-op before a group exists.
+  /// No-op before a group exists.
   void markLabPlaced() {
     if (_group == null) return;
     _labPlaced = true;
@@ -504,6 +516,11 @@ class StudentJourney extends ChangeNotifier {
       ..clear()
       ..addAll(unlocked);
     _clearError();
+    // Student chrome shows Misi 1 immediately (not a separate "Scene 1" stage).
+    if (!hasRunningMission && missionStatus(1) != MissionStatus.completed) {
+      startMissionFromIntent(1);
+      return;
+    }
     notifyListeners();
   }
 
@@ -525,6 +542,19 @@ class StudentJourney extends ChangeNotifier {
       sequenceCompleted = false;
       notifyListeners();
       return;
+    }
+
+    // Exclusive focus: demote any other running mission back to available.
+    for (final otherKey in MissionProgress.logicalIds) {
+      if (otherKey == key) continue;
+      final other = _missionProgress[otherKey];
+      if (other?.status == MissionStatus.running) {
+        _missionProgress[otherKey] = MissionProgress(
+          status: MissionStatus.available,
+          startedAt: other!.startedAt,
+          completedAt: other.completedAt,
+        );
+      }
     }
 
     if (existing?.status == MissionStatus.running) {
@@ -598,16 +628,22 @@ class StudentJourney extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Completes the focused mission observation (intent-driven, not linear).
+  /// Completes the focused mission, then advances to the next incomplete one.
   ///
-  /// When all three missions are completed, advances to conclusion. Otherwise
-  /// stays on Scene 1 so another intent can start a different mission.
+  /// Order is linear for the student CTA: M1 → M2 → M3 → conclusion.
+  /// Intent-driven starts still work; this only auto-advances after
+  /// "Selesaikan Misi".
   void completeActiveMission() {
     if (_stage != JourneyStage.investigating) return;
     final number = _missionIndex + 1;
     completeMissionObservation(number);
     if (allMissionsCompleted) {
       _transition(JourneyStage.conclusion);
+      return;
+    }
+    final next = _nextIncompleteMissionNumber();
+    if (next != null) {
+      startMissionFromIntent(next);
     } else {
       sequenceStepIndex = null;
       sequenceCompleted = false;
@@ -615,10 +651,18 @@ class StudentJourney extends ChangeNotifier {
     }
   }
 
+  /// Lowest mission number that is not yet [MissionStatus.completed].
+  int? _nextIncompleteMissionNumber() {
+    for (var i = 1; i <= content.missions.length; i++) {
+      if (missionStatus(i) != MissionStatus.completed) return i;
+    }
+    return null;
+  }
+
   /// Test helper: mark lab placed, complete M1–M3, enter conclusion.
   ///
-  /// Prefer this over looping [completeActiveMission] — that no longer advances
-  /// a linear counter and would hang if called in a `while (investigating)`.
+  /// Prefer this over looping [completeActiveMission] blindly — call once
+  /// per mission start, or use [debugCompleteAllMissionsToConclusion].
   @visibleForTesting
   void debugCompleteAllMissionsToConclusion() {
     if (_group == null) return;

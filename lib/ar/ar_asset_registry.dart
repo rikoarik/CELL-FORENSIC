@@ -11,19 +11,33 @@ import 'package:cell_forensic/ar/organelle_label_map.dart';
 class ArAssetRegistry {
   const ArAssetRegistry._();
 
-  /// Inventory size after E0-01 (not the aspirational “30”).
+  /// Inventory size after E0-01 + rework exports (not the aspirational “30”).
   static int get inventoriedCount => ArAssetManifest.allAssets.length;
 
   static bool get organelleLabelsSafe =>
       OrganelleLabelMap.assertProvisionalRules();
 
+  static const scene1 = 'assets/ar_models/scene-1.glb';
   static const mejaLab = 'assets/ar_models/Meja/MejaLab_Putih.glb';
+  /// Specimen trays that sit on the lab table under Sample A / Sample B.
+  static const tempatUji = 'assets/ar_models/Meja/TempatUji.glb';
+  /// Intact plant cell for live AR (AllInOne ~8MB — SceneView-safe).
+  ///
+  /// Export_2 (~14MB) is reserved for Mode 3D viewer; SceneView often fails
+  /// to inflate that size on mid-range Android.
   static const sampleA =
-      'assets/ar_models/SelTumbuhan/SelTumbuhanRework_Export 2 normal color.glb';
+      'assets/ar_models/SelTumbuhan/SelTumbuhanRework_AllInOne.glb';
+  /// Hi-fi intact plant cell for Model Viewer (Mode 3D).
+  static const sampleAViewer =
+      'assets/ar_models/SelTumbuhan/SelTumbuhanRework_Export_2_normal_color.glb';
   static const sampleADamaged =
-      'assets/ar_models/SelTumbuhan/SelTumbuhanRework_Export 1 normal color.glb';
+      'assets/ar_models/SelTumbuhan/SelTumbuhanRework_Export_1_normal_color.glb';
   static const sampleB =
-      'assets/ar_models/SelHewan/SelHewanBroken_NewExport.glb';
+      'assets/ar_models/SelHewan/SelHewanBroken_NewExport 2.glb';
+
+  /// Model path for the active render path (live AR vs 3D viewer).
+  static String sampleAFor({required bool liveAr}) =>
+      liveAr ? sampleA : sampleAViewer;
 
   static const nukleusSolo =
       'assets/ar_models/SelTumbuhan/SelTumbuhhanSolo/Nukleus_Solo.glb';
@@ -85,16 +99,17 @@ class ArAssetRegistry {
   static String cameraOrbitForStep(String? stepCode) {
     return switch (stepCode) {
       // M1: through-wall → organelle focus → yellow glow → deflated vacuole
-      'zoom_internal' => '0deg 58deg 1.05m',
-      'glow_organelles' => '35deg 50deg 1.35m',
-      'play_shrink_animation' => '25deg 65deg 1.25m',
-      'focus_sample_a' => '0deg 72deg 2.0m',
-      'zoom_membrane' => '0deg 65deg 1.4m',
-      'highlight_cell_wall' => '40deg 55deg 1.8m',
-      'show_torn_bilayer' || 'play_leak_particles' => '10deg 80deg 1.2m',
-      'show_damaged_sample_a' => '20deg 55deg 1.6m',
-      'show_both_samples' || 'show_force_arrows' => '0deg 70deg 2.8m',
-      _ => '0deg 75deg 2.2m',
+      // Relative radius keeps very differently-authored GLBs in frame.
+      'zoom_internal' => '0deg 58deg 75%',
+      'glow_organelles' => '35deg 50deg 90%',
+      'play_shrink_animation' => '25deg 65deg 85%',
+      'focus_sample_a' => '0deg 72deg 105%',
+      'zoom_membrane' => '0deg 65deg 80%',
+      'highlight_cell_wall' => '40deg 55deg 100%',
+      'show_torn_bilayer' || 'play_leak_particles' => '10deg 80deg 80%',
+      'show_damaged_sample_a' => '20deg 55deg 95%',
+      'show_both_samples' || 'show_force_arrows' => '0deg 70deg 120%',
+      _ => '0deg 75deg 105%',
     };
   }
 

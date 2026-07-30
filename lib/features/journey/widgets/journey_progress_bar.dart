@@ -103,10 +103,8 @@ class JourneyProgressBar extends StatelessWidget {
       JourneyStage.investigating => (
         journey.arSupported ? 'Investigasi AR' : 'Investigasi 3D',
         journey.labPlaced
-            ? (journey.runningMissionNumber != null
-                  ? journey.activeMission.title
-                  : 'Lab siap · tanya asisten untuk misi')
-            : 'Scene 1 · pindai meja laboratorium',
+            ? journey.activeMission.title
+            : '${journey.content.missions.first.title} · pindai meja',
         0.15 +
             (journey.missionProgress.values
                         .where((p) => p.isCompleted)

@@ -45,7 +45,7 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
   @override
   void initState() {
     super.initState();
-    _joinCodeController.text = _journey.joinCode ?? _journey.content.joinCode;
+    _joinCodeController.text = _journey.joinCode ?? '';
     final existing = _journey.group;
     if (existing != null) {
       _groupController.text = existing.name;
@@ -404,6 +404,19 @@ class _GroupSetupStep extends StatelessWidget {
                 ),
               ] else ...[
                 _GroupSummaryCard(group: group),
+                const SizedBox(height: 12),
+                OutlinedButton(
+                  key: const Key('changeGroupButton'),
+                  onPressed: busy
+                      ? null
+                      : () {
+                          groupController.clear();
+                          leaderController.clear();
+                          memberController.clear();
+                          journey.clearGroup();
+                        },
+                  child: const Text('Buat Kelompok Baru'),
+                ),
                 const SizedBox(height: 20),
                 Text('Anggota Kelompok', style: theme.textTheme.titleLarge),
                 const SizedBox(height: 8),

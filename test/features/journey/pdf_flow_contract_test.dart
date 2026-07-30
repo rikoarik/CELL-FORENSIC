@@ -150,19 +150,17 @@ void main() {
 
       expect(journey.labPlaced, isTrue);
       expect(journey.missionProgress, hasLength(3));
-      expect(journey.missionStatus(1), MissionStatus.available);
+      expect(journey.missionStatus(1), MissionStatus.running);
       expect(journey.missionStatus(2), MissionStatus.available);
       expect(journey.missionStatus(3), MissionStatus.available);
-      expect(journey.hasRunningMission, isFalse);
+      expect(journey.hasRunningMission, isTrue);
+      expect(journey.activeMission.code, 'MISI-1');
 
       final snap = journey.toSessionSnapshot()!;
       expect(snap.missionProgress, hasLength(3));
-      expect(
-        snap.missionProgress.values.every(
-          (p) => p.status == MissionProgressSnapshot.statusAvailable,
-        ),
-        isTrue,
-      );
+      expect(snap.missionProgress['mission1']!.status, 'running');
+      expect(snap.missionProgress['mission2']!.status, 'available');
+      expect(snap.missionProgress['mission3']!.status, 'available');
 
       await engine.dispose();
     });
@@ -249,7 +247,8 @@ void main() {
         journey.startMissionFromIntent(unknown.missionNumber!);
       }
 
-      expect(journey.hasRunningMission, isFalse);
+      expect(journey.hasRunningMission, isTrue);
+      expect(journey.runningMissionNumber, 1);
       expect(journey.missionProgress.keys, before.keys);
       for (final key in before.keys) {
         expect(journey.missionProgress[key]!.status, before[key]!.status);

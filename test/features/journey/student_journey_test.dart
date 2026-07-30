@@ -1,4 +1,5 @@
 import 'package:cell_forensic/domain/entities.dart';
+import 'package:cell_forensic/domain/mission_progress.dart';
 import 'package:cell_forensic/features/content/local_content_pack.dart';
 import 'package:cell_forensic/features/journey/student_journey.dart';
 import 'package:cell_forensic/features/session/session_snapshot_store.dart';
@@ -30,6 +31,23 @@ void main() {
     journey.goBack();
     expect(journey.stage, JourneyStage.deviceCheck);
     expect(journey.canGoBack, isFalse);
+  });
+
+  test('clearGroup allows creating a new group while keeping session', () {
+    final journey = StudentJourney(content: _pack())
+      ..completeDeviceCheck(arSupported: false)
+      ..joinWithGroup(groupName: 'Alpha', leaderName: 'Budi');
+    journey.goBack();
+    expect(journey.stage, JourneyStage.groupSetup);
+    expect(journey.groupName, 'Alpha');
+    expect(journey.joinCode, isNotNull);
+
+    journey.clearGroup();
+    expect(journey.group, isNull);
+    expect(journey.groupName, isNull);
+    expect(journey.leaderName, isNull);
+    expect(journey.joinCode, isNotNull);
+    expect(journey.stage, JourneyStage.groupSetup);
   });
 
   test('enableLiveAr upgrades Mode 3D without leaving investigating stage', () {
@@ -102,9 +120,11 @@ void main() {
 
     expect(journey.missionProgress, isEmpty);
     journey.markLabPlaced();
-    expect(journey.missionStatus(1).name, 'available');
+    expect(journey.missionStatus(1).name, 'running');
     expect(journey.missionStatus(2).name, 'available');
     expect(journey.missionStatus(3).name, 'available');
+    expect(journey.hasRunningMission, isTrue);
+    expect(journey.activeMission.code, 'MISI-1');
 
     journey.startMissionFromIntent(1);
     expect(journey.missionStatus(1).name, 'running');
@@ -127,6 +147,29 @@ void main() {
     journey.completeMissionObservation(3);
     expect(journey.allMissionsCompleted, isTrue);
     journey.completeActiveMission();
+    expect(journey.stage, JourneyStage.conclusion);
+  });
+
+  test('completeActiveMission advances M1 → M2 → M3 → conclusion', () {
+    final journey = StudentJourney(content: _pack())
+      ..completeDeviceCheck(arSupported: false)
+      ..joinWithGroup(groupName: 'Tim A', leaderName: 'Budi')
+      ..markLabPlaced()
+      ..startMissionFromIntent(1);
+
+    journey.completeActiveMission();
+    expect(journey.missionStatus(1), MissionStatus.completed);
+    expect(journey.missionStatus(2), MissionStatus.running);
+    expect(journey.activeMission.code, 'MISI-2');
+    expect(journey.stage, JourneyStage.investigating);
+
+    journey.completeActiveMission();
+    expect(journey.missionStatus(2), MissionStatus.completed);
+    expect(journey.missionStatus(3), MissionStatus.running);
+    expect(journey.activeMission.code, 'MISI-3');
+
+    journey.completeActiveMission();
+    expect(journey.allMissionsCompleted, isTrue);
     expect(journey.stage, JourneyStage.conclusion);
   });
 

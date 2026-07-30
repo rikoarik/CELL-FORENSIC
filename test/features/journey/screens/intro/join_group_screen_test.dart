@@ -28,7 +28,12 @@ void main() {
     await tester.pumpWidget(_wrap(journey));
 
     expect(find.byKey(const Key('joinCodeField')), findsOneWidget);
-    expect(find.textContaining(journey.content.joinCode), findsWidgets);
+    expect(
+      tester.widget<TextField>(find.byKey(const Key('joinCodeField')))
+          .controller
+          ?.text,
+      isEmpty,
+    );
   });
 
   testWidgets('joining by code then creating group reaches Scene 1 AR', (
@@ -37,6 +42,10 @@ void main() {
     final journey = _journey();
     await tester.pumpWidget(_wrap(journey));
 
+    await tester.enterText(
+      find.byKey(const Key('joinCodeField')),
+      journey.content.joinCode,
+    );
     await tester.tap(find.byKey(const Key('joinSessionButton')));
     await tester.pumpAndSettle();
     expect(journey.stage, JourneyStage.groupSetup);
@@ -70,6 +79,10 @@ void main() {
     final repo = _repo();
     await tester.pumpWidget(_wrap(journey, repo: repo));
 
+    await tester.enterText(
+      find.byKey(const Key('joinCodeField')),
+      journey.content.joinCode,
+    );
     await tester.tap(find.byKey(const Key('joinSessionButton')));
     await tester.pumpAndSettle();
     await tester.enterText(
@@ -104,5 +117,34 @@ void main() {
     expect(journey.stage, JourneyStage.joinSession);
     expect(journey.lastError, isNotNull);
     expect(find.text(journey.lastError!), findsOneWidget);
+  });
+
+  testWidgets('Buat Kelompok Baru clears group and shows create form', (
+    tester,
+  ) async {
+    final journey = _journey();
+    await tester.pumpWidget(_wrap(journey));
+
+    await tester.enterText(
+      find.byKey(const Key('joinCodeField')),
+      journey.content.joinCode,
+    );
+    await tester.tap(find.byKey(const Key('joinSessionButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('joinGroupNameField')),
+      'Tim Lama',
+    );
+    await tester.enterText(find.byKey(const Key('joinLeaderNameField')), 'Ani');
+    await tester.tap(find.byKey(const Key('createGroupButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('changeGroupButton')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('changeGroupButton')));
+    await tester.pumpAndSettle();
+
+    expect(journey.group, isNull);
+    expect(find.byKey(const Key('joinGroupNameField')), findsOneWidget);
+    expect(find.byKey(const Key('createGroupButton')), findsOneWidget);
   });
 }

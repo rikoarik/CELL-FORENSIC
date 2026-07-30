@@ -23,6 +23,8 @@ abstract final class Misi2VisualHelpers {
   static Future<void> stayOnTabletop(ArSceneEngine engine) async {
     await engine.showNode(ArNodeIds.primary);
     await engine.showNode(ArNodeIds.labTable);
+    await engine.showNode(ArNodeIds.tempatUjiB);
+    await engine.hideNode(ArNodeIds.tempatUjiA);
   }
 
   /// Step `focus_sample_b` — Sampel B outer layer, membrane highlighted.

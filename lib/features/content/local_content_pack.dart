@@ -138,9 +138,10 @@ ContentPack buildLocalContentPack() {
               'sekarat',
             },
             response:
-                'Perhatikan organel tervalidasi di Sampel A (mis. nukleus, '
-                'kloroplas, vakuola). Amati warna glow dan perubahan bentuk, '
-                'lalu catat pada logbook. Jangan mengarang label Organel X/Y.',
+                'Hasil pemindaian menunjukkan Sampel A mengalami kerusakan '
+                'parah pada Kloroplas dan Vakuola Raksasa. Coba analisis di '
+                'logbook kalian, apa dampaknya bagi energi dan tekanan '
+                'internal sel jika kedua organel tersebut tidak berfungsi?',
             sequenceCode: 'SEQ-MISI-1',
             missionNumber: 1,
           ),
@@ -184,9 +185,10 @@ ContentPack buildLocalContentPack() {
               'hidrofobik',
             },
             response:
-                'Amati lapisan membran Sampel B secara keseluruhan. Perhatikan '
-                'bagian yang tampak robek dan cairan yang keluar, lalu catat '
-                'pada logbook. Jangan mengarang "membran 1/2".',
+                'Terjadi kerusakan struktural pada Membran Sel (Fosfolipid '
+                'Bilayer) Sampel B. Ingat sifat membran yang selektif '
+                'permeabel. Jika struktur ekor hidrofobiknya rusak, menurutmu '
+                'apa yang terjadi pada kontrol keluar masuknya zat?',
             sequenceCode: 'SEQ-MISI-2',
             missionNumber: 2,
           ),
@@ -232,9 +234,12 @@ ContentPack buildLocalContentPack() {
               'dinding sel',
             },
             response:
-                'Bandingkan ketahanan kedua sampel. Perhatikan dinding sel '
-                'Sampel A yang menahan tekanan, lalu catat perbedaannya di '
-                'logbook tanpa mengarang label provisional.',
+                'Perhatikan lapisan paling luar yang bercahaya hijau pada '
+                'Sampel A. Itu adalah Dinding Sel dari selulosa yang kaku. '
+                'Coba bandingkan dengan Sampel B yang tidak memilikinya. '
+                'Struktur inilah yang memberikan implikasi kekuatan mekanis '
+                'berbeda pada kedua makhluk hidup tersebut saat menghadapi '
+                'krisis cairan.',
             sequenceCode: 'SEQ-MISI-3',
             missionNumber: 3,
           ),
@@ -242,9 +247,12 @@ ContentPack buildLocalContentPack() {
             code: 'compare_outer_layers',
             keywords: {'bandingkan', 'lapisan'},
             response:
-                'Bandingkan lapisan terluar kedua sampel. Perhatikan dinding '
-                'sel pada Sampel A dan bandingkan dengan membran Sampel B, '
-                'lalu catat perbedaannya di logbook.',
+                'Perhatikan lapisan paling luar yang bercahaya hijau pada '
+                'Sampel A. Itu adalah Dinding Sel dari selulosa yang kaku. '
+                'Coba bandingkan dengan Sampel B yang tidak memilikinya. '
+                'Struktur inilah yang memberikan implikasi kekuatan mekanis '
+                'berbeda pada kedua makhluk hidup tersebut saat menghadapi '
+                'krisis cairan.',
             sequenceCode: 'SEQ-MISI-3',
             missionNumber: 3,
           ),
@@ -252,8 +260,9 @@ ContentPack buildLocalContentPack() {
             code: 'request_hint_m3',
             keywords: {'petunjuk', 'perbedaan'},
             response:
-                'Coba tanyakan kenapa Sampel A tidak hancur seperti Sampel B, '
-                'atau apa perbedaannya.',
+                'Perhatikan lapisan paling luar yang bercahaya hijau pada '
+                'Sampel A. Itu adalah Dinding Sel dari selulosa yang kaku. '
+                'Coba bandingkan dengan Sampel B yang tidak memilikinya.',
           ),
         ],
       ),

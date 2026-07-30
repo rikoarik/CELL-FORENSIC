@@ -118,6 +118,7 @@ void main() {
       await engine.place(const ArPlacement(x: 0, y: 0, z: 0));
       await engine.initLabScene(
         labTableModelPath: ArAssetRegistry.mejaLab,
+        tempatUjiModelPath: ArAssetRegistry.tempatUji,
         sampleAModelPath: ArAssetRegistry.sampleA,
         sampleBModelPath: ArAssetRegistry.sampleB,
       );
@@ -127,9 +128,18 @@ void main() {
       expect(visual.activeModelPath, ArAssetRegistry.sampleA);
       expect(visual.secondaryModelPath, ArAssetRegistry.sampleB);
       expect(visual.visibleNodes[ArNodeIds.labTable], isTrue);
+      expect(visual.visibleNodes[ArNodeIds.tempatUjiA], isTrue);
+      expect(visual.visibleNodes[ArNodeIds.tempatUjiB], isTrue);
+      expect(visual.nodeModels[ArNodeIds.tempatUjiA], ArAssetRegistry.tempatUji);
       expect(visual.visibleNodes[ArNodeIds.sampleA], isTrue);
       expect(visual.visibleNodes[ArNodeIds.sampleB], isTrue);
-      expect(visual.overlay, ArOverlayEffect.comparisonLabels);
+      expect(
+        visual.nodePosition[ArNodeIds.tempatUjiA]!.y,
+        lessThan(visual.nodePosition[ArNodeIds.sampleA]!.y),
+      );
+      // Trays must sit on the meja tabletop (~0.70 m), not under the desk.
+      expect(visual.nodePosition[ArNodeIds.tempatUjiA]!.y, greaterThan(0.5));
+      expect(visual.overlay, ArOverlayEffect.none);
       // Placement must not complete a mission action (GAP-1).
       expect(
         events.where((e) => e.type == ArSceneEventType.actionCompleted),

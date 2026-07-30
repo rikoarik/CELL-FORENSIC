@@ -22,6 +22,8 @@ abstract final class Misi3Visuals {
   static Future<void> _stayOnTabletop(ArSceneEngine engine) async {
     await engine.showNode(ArNodeIds.primary);
     await engine.showNode(ArNodeIds.labTable);
+    await engine.showNode(ArNodeIds.tempatUjiA);
+    await engine.showNode(ArNodeIds.tempatUjiB);
   }
 
   static Future<void> _pairSamples(

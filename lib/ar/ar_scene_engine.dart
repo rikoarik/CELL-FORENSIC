@@ -78,6 +78,10 @@ enum ArOverlayEffect {
 abstract final class ArNodeIds {
   static const primary = 'primary';
   static const labTable = 'lab_table';
+  /// Specimen tray under Sample A (TempatUji.glb on the lab table).
+  static const tempatUjiA = 'tempat_uji_a';
+  /// Specimen tray under Sample B (TempatUji.glb on the lab table).
+  static const tempatUjiB = 'tempat_uji_b';
   static const sampleA = 'sample_a';
   static const sampleB = 'sample_b';
   static const chloroplast = 'chloroplast';
@@ -309,6 +313,7 @@ abstract interface class ArSceneEngine {
     required String labTableModelPath,
     required String sampleAModelPath,
     required String sampleBModelPath,
+    String? tempatUjiModelPath,
     double sampleOffsetX,
   });
 
@@ -422,39 +427,61 @@ class ControllableArSceneEngine implements ArSceneEngine {
     required String labTableModelPath,
     required String sampleAModelPath,
     required String sampleBModelPath,
-    double sampleOffsetX = 0.11,
+    String? tempatUjiModelPath,
+    double sampleOffsetX = 0.12,
   }) async {
-    // Scene 1 base: lab table + both samples on top. This is a visual setup
-    // only — no [runAction]/sequence advancement happens here.
     _clearZoomSnapshot();
-    final sampleY = 0.03;
+    // Meja 2.06×0.90×1.27 @ scaleToUnits 1.6 → tabletop Y ≈ 0.70 m.
+    // TempatUji (0.13×0.02) on that surface; cells centered in each dish.
+    const tableTopY = 0.70;
+    const trayY = tableTopY + 0.01;
+    // Mesh-center lift so cells sit in the shallow TempatUji bowl (~2 cm author).
+    const sampleY = trayY + 0.045;
+    final trayPath = tempatUjiModelPath;
+    final models = <String, String>{
+      ArNodeIds.labTable: labTableModelPath,
+      ArNodeIds.primary: sampleAModelPath,
+      ArNodeIds.sampleA: sampleAModelPath,
+      ArNodeIds.sampleB: sampleBModelPath,
+      if (trayPath != null) ...{
+        ArNodeIds.tempatUjiA: trayPath,
+        ArNodeIds.tempatUjiB: trayPath,
+      },
+    };
+    // Slight −Z so the meja mesh (authored center ≈ +Z) sits over the anchor.
+    const tableZ = -0.30;
+    final positions = <String, ArVec3>{
+      ArNodeIds.labTable: const ArVec3(0, 0, tableZ),
+      ArNodeIds.primary: ArVec3(-sampleOffsetX, sampleY, tableZ),
+      ArNodeIds.sampleA: ArVec3(-sampleOffsetX, sampleY, tableZ),
+      ArNodeIds.sampleB: ArVec3(sampleOffsetX, sampleY, tableZ),
+      if (trayPath != null) ...{
+        ArNodeIds.tempatUjiA: ArVec3(-sampleOffsetX, trayY, tableZ),
+        ArNodeIds.tempatUjiB: ArVec3(sampleOffsetX, trayY, tableZ),
+      },
+    };
+    final visible = <String, bool>{
+      ArNodeIds.labTable: true,
+      ArNodeIds.primary: true,
+      ArNodeIds.sampleA: true,
+      ArNodeIds.sampleB: true,
+      if (trayPath != null) ...{
+        ArNodeIds.tempatUjiA: true,
+        ArNodeIds.tempatUjiB: true,
+      },
+    };
     _setVisual(
       _visual.copyWith(
         labTableModelPath: labTableModelPath,
         activeModelPath: sampleAModelPath,
         secondaryModelPath: sampleBModelPath,
         secondaryOffsetX: sampleOffsetX,
-        overlay: ArOverlayEffect.comparisonLabels,
+        overlay: ArOverlayEffect.none,
         nodeScale: const {},
         nodeRotationY: const {},
-        nodeModels: {
-          ArNodeIds.labTable: labTableModelPath,
-          ArNodeIds.primary: sampleAModelPath,
-          ArNodeIds.sampleA: sampleAModelPath,
-          ArNodeIds.sampleB: sampleBModelPath,
-        },
-        nodePosition: {
-          ArNodeIds.labTable: ArVec3.zero,
-          ArNodeIds.primary: ArVec3(-sampleOffsetX, sampleY, 0),
-          ArNodeIds.sampleA: ArVec3(-sampleOffsetX, sampleY, 0),
-          ArNodeIds.sampleB: ArVec3(sampleOffsetX, sampleY, 0),
-        },
-        visibleNodes: const {
-          ArNodeIds.labTable: true,
-          ArNodeIds.primary: true,
-          ArNodeIds.sampleA: true,
-          ArNodeIds.sampleB: true,
-        },
+        nodeModels: models,
+        nodePosition: positions,
+        visibleNodes: visible,
         clearHighlight: true,
         clearOutline: true,
         clearFocus: true,

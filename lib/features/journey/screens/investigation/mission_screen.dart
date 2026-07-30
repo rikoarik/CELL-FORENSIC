@@ -18,7 +18,7 @@ import 'package:flutter/material.dart';
 
 /// Scene 1 + intent-driven investigation surface (PDF).
 ///
-/// Layout: ~70% AR camera / ~30% AI chat with text + mic ("Tanya Asisten AI").
+/// Layout: full-bleed AR/3D preview; AI chat + logbook open via FAB sheets.
 /// Missions advance from matched intents — not a linear counter.
 class MissionScreen extends StatefulWidget {
   const MissionScreen({required this.journey, super.key});
@@ -58,8 +58,8 @@ class _MissionScreenState extends State<MissionScreen> {
   bool _isPlaced = false;
   bool _showLogbook = false;
   bool _engineWantsLiveAr = false;
-
-  static const _wideBreakpoint = 860.0;
+  bool _workspaceSheetOpen = false;
+  VoidCallback? _refreshWorkspaceSheet;
 
   MissionContent get _mission => widget.journey.activeMission;
 
@@ -99,8 +99,15 @@ class _MissionScreenState extends State<MissionScreen> {
     return const SupabaseAiAssistantClient();
   }
 
+  void _onAssistantChanged() {
+    if (!mounted) return;
+    setState(() {});
+    _refreshWorkspaceSheet?.call();
+  }
+
   void _bindMission({required bool recreateEngine}) {
     _missionCode = _mission.code;
+    _assistant?.removeListener(_onAssistantChanged);
     _assistant?.dispose();
     _assistant = AssistantViewModel(
       matcher: _packMatcher,
@@ -114,7 +121,7 @@ class _MissionScreenState extends State<MissionScreen> {
       onSequenceCode: (code) {
         unawaited(_playSequenceFromCode(code));
       },
-    );
+    )..addListener(_onAssistantChanged);
     _assistantController.clear();
 
     for (final controller in _logbookControllers.values) {
@@ -171,7 +178,11 @@ class _MissionScreenState extends State<MissionScreen> {
     });
 
     if (fallback3d && !widget.journey.labPlaced) {
-      widget.journey.markLabPlaced();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !widget.journey.labPlaced) {
+          widget.journey.markLabPlaced();
+        }
+      });
     }
     if (_isPlaced) {
       unawaited(_initLabScene());
@@ -181,7 +192,10 @@ class _MissionScreenState extends State<MissionScreen> {
   Future<void> _initLabScene() async {
     await _engine.initLabScene(
       labTableModelPath: ArAssetRegistry.mejaLab,
-      sampleAModelPath: ArAssetRegistry.sampleA,
+      tempatUjiModelPath: ArAssetRegistry.tempatUji,
+      sampleAModelPath: ArAssetRegistry.sampleAFor(
+        liveAr: widget.journey.arSupported,
+      ),
       sampleBModelPath: ArAssetRegistry.sampleB,
     );
     if (mounted) setState(() {});
@@ -248,6 +262,7 @@ class _MissionScreenState extends State<MissionScreen> {
     widget.journey.removeListener(_onJourneyChanged);
     _engineEvents?.cancel();
     _sceneEngine?.dispose();
+    _assistant?.removeListener(_onAssistantChanged);
     _assistant?.dispose();
     _assistantController.dispose();
     _assistantFocus.dispose();
@@ -280,9 +295,6 @@ class _MissionScreenState extends State<MissionScreen> {
     final sequence = _sequence;
     final totalSteps = _mission.sequence.steps.length;
     final currentStep = sequence?.currentStep;
-    if (!_isPlaced && widget.journey.arSupported) {
-      return 'Pindai permukaan meja untuk memunculkan Laboratorium Forensik Sel.';
-    }
     if (_sequenceCompleted) return 'Semua langkah scene selesai.';
     if (_sequencePaused) {
       return 'Sequence dijeda sampai pelacakan AR pulih.';
@@ -502,13 +514,16 @@ class _MissionScreenState extends State<MissionScreen> {
         offset: content.draftAiQuestion.length,
       ),
     );
-    setState(() => _showLogbook = false);
-    _assistantFocus.requestFocus();
+    unawaited(
+      _openWorkspaceSheet(logbook: false).then((_) {
+        if (!mounted) return;
+        _assistantFocus.requestFocus();
+      }),
+    );
   }
 
   /// Hotspot "Catat di Logbook" — open logbook and focus related field.
   void _onHotspotLogbook(OrganelleHotspotContent content) {
-    setState(() => _showLogbook = true);
     final prompts = _mission.logbookPrompts;
     String? match;
     for (final prompt in prompts) {
@@ -519,10 +534,64 @@ class _MissionScreenState extends State<MissionScreen> {
       }
     }
     match ??= prompts.isNotEmpty ? prompts.first : null;
-    if (match == null) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _logbookFocusNodes[match]?.requestFocus();
+    unawaited(
+      _openWorkspaceSheet(logbook: true).then((_) {
+        if (!mounted || match == null) return;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _logbookFocusNodes[match]?.requestFocus();
+        });
+      }),
+    );
+  }
+
+  Future<void> _openWorkspaceSheet({required bool logbook}) async {
+    if (!mounted) return;
+    if (_workspaceSheetOpen) {
+      setState(() => _showLogbook = logbook);
+      _refreshWorkspaceSheet?.call();
+      return;
+    }
+    setState(() {
+      _showLogbook = logbook;
+      _workspaceSheetOpen = true;
     });
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            _refreshWorkspaceSheet = () => setModalState(() {});
+            final media = MediaQuery.of(context);
+            final keyboard = media.viewInsets.bottom;
+            final available =
+                media.size.height - media.padding.top - keyboard;
+            final height = (available * 0.72).clamp(280.0, available);
+            return AnimatedPadding(
+              duration: const Duration(milliseconds: 120),
+              curve: Curves.easeOut,
+              padding: EdgeInsets.only(bottom: keyboard),
+              child: SizedBox(
+                height: height,
+                child: _assistantWorkspace(
+                  context,
+                  onTabChanged: (nextLogbook) {
+                    setState(() => _showLogbook = nextLogbook);
+                    setModalState(() {});
+                  },
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    if (mounted) {
+      _refreshWorkspaceSheet = null;
+      setState(() => _workspaceSheetOpen = false);
+    }
   }
 
   void _autosaveLogbook() {
@@ -536,88 +605,59 @@ class _MissionScreenState extends State<MissionScreen> {
   @override
   Widget build(BuildContext context) {
     final mission = _mission;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    // Clear of scene bottom bar (Jalankan/Reset ≈ 72) + observation sheet
+    // (~160) + safe area so FABs never cover the hotspot popup.
+    final fabBottom = 88.0 + 160.0 + bottomInset;
     return Scaffold(
-      body: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            _missionChrome(context),
-            Expanded(child: _responsiveShell(context, mission: mission)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Compact mission chrome — title + chips + complete affordance only.
-  /// Briefing / progress visuals already live in [JourneyProgressBar].
-  Widget _missionChrome(BuildContext context) {
-    final theme = Theme.of(context);
-    final journey = widget.journey;
-    final canComplete = journey.allMissionsCompleted || _sequenceCompleted;
-    final titleText = journey.hasRunningMission || journey.labPlaced
-        ? journey.activeMission.title
-        : 'Scene 1 — Laboratorium Forensik Sel';
-    final showBriefing = journey.hasRunningMission;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      backgroundColor: const Color(0xFF1A1F24),
+      body: Column(
         children: [
-          Text(
-            titleText,
-            style: theme.textTheme.titleSmall,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          if (showBriefing)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                journey.activeMission.briefing,
-                style: theme.textTheme.bodySmall,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+          SafeArea(
+            bottom: false,
+            child: ColoredBox(
+              color: Theme.of(context).colorScheme.surface,
+              child: _missionChrome(context),
             ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              for (var i = 1; i <= journey.missionCount; i++) ...[
-                if (i > 1) const SizedBox(width: 6),
-                Expanded(
-                  child: _MissionChip(
-                    missionNumber: i,
-                    label: _missionChipLabel(i),
-                    status: journey.missionStatus(i),
+          ),
+          Expanded(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  bottom: 88.0 + bottomInset,
+                  child: _scenePanel(mission: mission),
+                ),
+                // Left side so Reset (right) stays tappable.
+                Positioned(
+                  left: 12,
+                  bottom: fabBottom,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      FloatingActionButton.small(
+                        key: const Key('assistant-fab'),
+                        heroTag: 'mission-assistant-fab',
+                        tooltip: 'Asisten AI',
+                        onPressed: () => unawaited(
+                          _openWorkspaceSheet(logbook: false),
+                        ),
+                        child: const Icon(Icons.smart_toy_outlined),
+                      ),
+                      const SizedBox(height: 8),
+                      FloatingActionButton.small(
+                        key: const Key('mission-logbook-toggle'),
+                        heroTag: 'mission-logbook-fab',
+                        tooltip: 'Logbook',
+                        onPressed: () => unawaited(
+                          _openWorkspaceSheet(logbook: true),
+                        ),
+                        child: const Icon(Icons.menu_book_outlined),
+                      ),
+                    ],
                   ),
                 ),
               ],
-              const SizedBox(width: 4),
-              IconButton(
-                key: const Key('mission-logbook-toggle'),
-                tooltip: 'Logbook',
-                onPressed: () => setState(() => _showLogbook = !_showLogbook),
-                icon: Icon(
-                  _showLogbook
-                      ? Icons.menu_book_rounded
-                      : Icons.menu_book_outlined,
-                  size: 22,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          FilledButton(
-            key: const Key('mission-complete'),
-            onPressed: canComplete
-                ? widget.journey.completeActiveMission
-                : null,
-            child: Text(
-              journey.allMissionsCompleted
-                  ? 'Ke Kesimpulan'
-                  : 'Selesaikan Misi',
             ),
           ),
         ],
@@ -625,115 +665,156 @@ class _MissionScreenState extends State<MissionScreen> {
     );
   }
 
-  Widget _responsiveShell(
-    BuildContext context, {
-    required MissionContent mission,
-  }) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= _wideBreakpoint;
-        final scenePanel = MissionScenePanel(
-          key: ValueKey(
-            'scene-${mission.code}-ar=${widget.journey.arSupported}',
+  /// One-row chrome — title + complete. Briefing lives in progress bar.
+  Widget _missionChrome(BuildContext context) {
+    final theme = Theme.of(context);
+    final journey = widget.journey;
+    final canComplete = journey.allMissionsCompleted || _sequenceCompleted;
+    final titleText = journey.activeMission.title;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 8, 4),
+      child: Row(
+        children: [
+          if (_missionNumber > 1)
+            IconButton(
+              key: const Key('mission-prev'),
+              icon: const Icon(Icons.chevron_left),
+              tooltip: 'Misi sebelumnya',
+              visualDensity: VisualDensity.compact,
+              onPressed: () =>
+                  widget.journey.startMissionFromIntent(_missionNumber - 1),
+            ),
+          Expanded(
+            child: Text(
+              titleText,
+              style: theme.textTheme.titleSmall,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          useAr: widget.journey.arSupported,
-          missionCode: mission.code,
-          stepCode: _sequence?.currentStep?.code,
-          statusLabel: _statusLabel,
-          stepLabel: _stepLabel,
-          sequenceCompleted: _sequenceCompleted,
-          sequencePaused: _sequencePaused,
-          sceneEngine: _engine,
-          onPlacementChanged: (placed) {
-            unawaited(_onPlacementChanged(placed));
-          },
-          onRunStep: () {
-            unawaited(_runStep());
-          },
-          onRequestLiveAr: widget.journey.arSupported ? null : _requestLiveAr,
-          initiallyInspectedHotspots: {
-            for (final raw in widget.journey.inspectedOrganelleHotspots)
-              ?SampleAOrganelleHotspots.tryParse(raw),
-          },
-          onInspectedHotspotsChanged: (ids) {
-            widget.journey.saveInspectedOrganelleHotspots(
-              ids.map((e) => e.name),
-            );
-          },
-          onHotspotAskAi: _onHotspotAskAi,
-          onHotspotLogbook: _onHotspotLogbook,
-        );
-
-        final assistantPanel = Material(
-          color: Theme.of(context).colorScheme.surface,
-          elevation: 2,
-          child: _assistantWorkspace(context),
-        );
-
-        if (isWide) {
-          return Row(
-            children: [
-              Expanded(flex: 62, child: scenePanel),
-              const VerticalDivider(width: 1, thickness: 1),
-              Expanded(flex: 38, child: assistantPanel),
-            ],
-          );
-        }
-
-        return Column(
-          children: [
-            Expanded(flex: 65, child: scenePanel),
-            const SizedBox(height: 4),
-            Expanded(flex: 35, child: assistantPanel),
-          ],
-        );
-      },
+          const SizedBox(width: 8),
+          FilledButton(
+            key: const Key('mission-complete'),
+            onPressed: canComplete
+                ? widget.journey.completeActiveMission
+                : null,
+            style: FilledButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
+            child: Text(
+              journey.allMissionsCompleted
+                  ? 'Kesimpulan'
+                  : 'Selesaikan',
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _assistantWorkspace(BuildContext context) {
+  Widget _scenePanel({required MissionContent mission}) {
+    return MissionScenePanel(
+      key: ValueKey(
+        'scene-${mission.code}-ar=${widget.journey.arSupported}',
+      ),
+      useAr: widget.journey.arSupported,
+      missionCode: mission.code,
+      stepCode: _sequence?.currentStep?.code,
+      statusLabel: _statusLabel,
+      stepLabel: _stepLabel,
+      sequenceCompleted: _sequenceCompleted,
+      sequencePaused: _sequencePaused,
+      sceneEngine: _engine,
+      onPlacementChanged: (placed) {
+        unawaited(_onPlacementChanged(placed));
+      },
+      onRunStep: () {
+        unawaited(_runStep());
+      },
+      onRequestLiveAr: widget.journey.arSupported ? null : _requestLiveAr,
+      initiallyInspectedHotspots: {
+        for (final raw in widget.journey.inspectedOrganelleHotspots)
+          ?SampleAOrganelleHotspots.tryParse(raw),
+      },
+      onInspectedHotspotsChanged: (ids) {
+        widget.journey.saveInspectedOrganelleHotspots(
+          ids.map((e) => e.name),
+        );
+      },
+      onHotspotAskAi: _onHotspotAskAi,
+      onHotspotLogbook: _onHotspotLogbook,
+    );
+  }
+
+  Widget _assistantWorkspace(
+    BuildContext context, {
+    required void Function(bool logbook) onTabChanged,
+  }) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final mission = _mission;
     final activeTab = _showLogbook ? _AssistantTab.logbook : _AssistantTab.chat;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-          child: SegmentedButton<_AssistantTab>(
-            key: const Key('assistant-tab-bar'),
-            segments: const [
-              ButtonSegment<_AssistantTab>(
-                value: _AssistantTab.chat,
-                icon: Icon(Icons.smart_toy_outlined),
-                label: Text('Asisten', key: Key('assistant-tab-chat')),
-              ),
-              ButtonSegment<_AssistantTab>(
-                value: _AssistantTab.logbook,
-                icon: Icon(Icons.menu_book_outlined),
-                label: Text('Logbook', key: Key('assistant-tab-logbook')),
-              ),
-            ],
-            selected: <_AssistantTab>{activeTab},
-            onSelectionChanged: (selection) {
-              final next = selection.single;
-              if (next != activeTab) {
-                setState(() => _showLogbook = next == _AssistantTab.logbook);
-              }
-            },
+    return Material(
+      color: theme.colorScheme.surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+            child: SegmentedButton<_AssistantTab>(
+              key: const Key('assistant-tab-bar'),
+              segments: const [
+                ButtonSegment<_AssistantTab>(
+                  value: _AssistantTab.chat,
+                  icon: Icon(Icons.smart_toy_outlined),
+                  label: Text('Asisten', key: Key('assistant-tab-chat')),
+                ),
+                ButtonSegment<_AssistantTab>(
+                  value: _AssistantTab.logbook,
+                  icon: Icon(Icons.menu_book_outlined),
+                  label: Text('Logbook', key: Key('assistant-tab-logbook')),
+                ),
+              ],
+              selected: <_AssistantTab>{activeTab},
+              onSelectionChanged: (selection) {
+                final next = selection.single;
+                final nextLogbook = next == _AssistantTab.logbook;
+                if (nextLogbook != _showLogbook) {
+                  onTabChanged(nextLogbook);
+                }
+              },
+            ),
           ),
-        ),
-        Expanded(
-          child: KeyedSubtree(
-            key: Key('assistant-tab-view-${activeTab.name}'),
-            child: activeTab == _AssistantTab.chat
-                ? _chatTab(context, theme: theme, scheme: scheme)
-                : _logbookTab(mission: mission),
+          if (activeTab == _AssistantTab.chat)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: Text(
+                _assistantVm.cloudUnavailable
+                    ? 'Mode lokal — Edge AI belum siap (cek OPENAI_API_KEY).'
+                    : (_assistantVm.cloudConfigured
+                          ? 'Mode cloud (Supabase ai-assistant)'
+                          : 'Mode lokal — Supabase belum dikonfigurasi'),
+                key: const Key('assistant-cloud-status'),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: _assistantVm.cloudUnavailable
+                      ? scheme.error
+                      : scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          Expanded(
+            child: KeyedSubtree(
+              key: Key('assistant-tab-view-${activeTab.name}'),
+              child: activeTab == _AssistantTab.chat
+                  ? _chatTab(context, theme: theme, scheme: scheme)
+                  : _logbookTab(mission: mission),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -843,8 +924,9 @@ class _MissionScreenState extends State<MissionScreen> {
 
         if (tight) {
           return Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-            child: ListView(
+            padding: const EdgeInsets.fromLTRB(12, 20, 12, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 header,
                 const SizedBox(height: 6),
@@ -873,7 +955,7 @@ class _MissionScreenState extends State<MissionScreen> {
         }
 
         return Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          padding: const EdgeInsets.fromLTRB(12, 20, 12, 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1004,78 +1086,48 @@ class _MissionScreenState extends State<MissionScreen> {
 
   Widget _logbookInline({required MissionContent mission}) {
     final prompts = mission.logbookPrompts;
-    return ListView(
-      children: [
-        for (var i = 0; i < prompts.length; i++)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: TextField(
-              key: Key('logbook-field-$i'),
-              controller: _logbookControllers[prompts[i]],
-              focusNode: _logbookFocusNodes[prompts[i]],
-              onChanged: (_) => _autosaveLogbook(),
-              minLines: 1,
-              maxLines: 2,
-              decoration: InputDecoration(
-                isDense: true,
-                labelText: prompts[i],
-                border: const OutlineInputBorder(),
-              ),
-            ),
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    return ListView.builder(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: EdgeInsets.only(bottom: 24 + keyboard),
+      itemCount: prompts.length,
+      itemBuilder: (context, i) {
+        final prompt = prompts[i];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Builder(
+            builder: (fieldContext) {
+              return TextField(
+                key: Key('logbook-field-$i'),
+                controller: _logbookControllers[prompt],
+                focusNode: _logbookFocusNodes[prompt],
+                onChanged: (_) => _autosaveLogbook(),
+                minLines: 1,
+                maxLines: 3,
+                scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 160),
+                onTap: () {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!fieldContext.mounted) return;
+                    Scrollable.ensureVisible(
+                      fieldContext,
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOut,
+                      alignment: 0.15,
+                    );
+                  });
+                },
+                decoration: InputDecoration(
+                  isDense: true,
+                  labelText: prompt,
+                  border: const OutlineInputBorder(),
+                ),
+              );
+            },
           ),
-      ],
+        );
+      },
     );
   }
 }
 
 enum _AssistantTab { chat, logbook }
-
-String _missionChipLabel(int missionNumber) => switch (missionNumber) {
-  1 || 2 => 'M$missionNumber Analisis',
-  3 => 'M3 Perbedaan',
-  _ => 'M$missionNumber',
-};
-
-class _MissionChip extends StatelessWidget {
-  const _MissionChip({
-    required this.missionNumber,
-    required this.label,
-    required this.status,
-  });
-
-  final int missionNumber;
-  final String label;
-  final MissionStatus status;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final (bg, fg) = switch (status) {
-      MissionStatus.locked => (
-        scheme.surfaceContainerHighest,
-        scheme.onSurfaceVariant,
-      ),
-      MissionStatus.available => (
-        scheme.secondaryContainer,
-        scheme.onSecondaryContainer,
-      ),
-      MissionStatus.running => (scheme.primary, scheme.onPrimary),
-      MissionStatus.completed => (scheme.tertiary, scheme.onTertiary),
-    };
-    return Container(
-      key: Key('mission-chip-$missionNumber-${status.name}'),
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label,
-        textAlign: TextAlign.center,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: fg),
-      ),
-    );
-  }
-}

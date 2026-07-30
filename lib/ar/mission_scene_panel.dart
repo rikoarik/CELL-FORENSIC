@@ -21,6 +21,7 @@ import 'package:cell_forensic/ar/ar_visual_director.dart';
 import 'package:cell_forensic/ar/glb_asset_loader.dart';
 import 'package:cell_forensic/ar/organelle_hotspot.dart';
 import 'package:cell_forensic/ar/organelle_hotspot_layer.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart' hide ArPlacement;
 import 'package:vector_math/vector_math_64.dart' hide Colors;
@@ -111,7 +112,16 @@ double combineLiveNodeScale({
 
 class _MissionScenePanelState extends State<MissionScenePanel>
     with WidgetsBindingObserver {
-  static const _baseScale = 0.08;
+  /// Cell `scaleToUnits` so Sampel A/B nearly fill TempatUji (~0.22 m dishes).
+  /// Author sizes: sel tumbuhan ~11 m AABB / sel hewan ~2.2 m → both become ~0.20 m.
+  static const _baseScale = 0.20;
+  /// Desk footprint (SceneView `scaleToUnits`). Meja 2.06×0.90×1.27 → at 1.6 m
+  /// the authored tabletop (Y=0.90) sits ≈ [_labTableTopY] above the plane.
+  static const _labTableBaseScale = 1.60;
+  /// TempatUji author 0.13×0.02×0.13 → ~0.22 m diameter on the tabletop.
+  static const _tempatUjiBaseScale = 0.22;
+  /// Half-gap between Sampel A / B tray centers on the 1.6 m desk.
+  static const _sampleOffsetX = 0.12;
   static const _director = ArVisualDirector();
 
   /// Keeps the AR platform view identity stable across parent rebuilds.
@@ -122,9 +132,12 @@ class _MissionScenePanelState extends State<MissionScenePanel>
   ARAnchorManager? _anchors;
   ARPlaneAnchor? _placedAnchor;
   ARNode? _labTableNode;
+  ARNode? _tempatUjiANode;
+  ARNode? _tempatUjiBNode;
   ARNode? _placedNode;
   ARNode? _secondaryNode;
   String? _labTableAssetPath;
+  String? _tempatUjiAssetPath;
   String? _placedAssetPath;
   String? _secondaryAssetPath;
   String? _arError;
@@ -139,18 +152,20 @@ class _MissionScenePanelState extends State<MissionScenePanel>
 
   double _gestureScale = 1;
   double _gestureRotationY = 0;
-  String? _selectedStructure;
   late final OrganelleHotspotController _hotspots;
+  Timer? _introDismissTimer;
 
   String get _activeAsset {
     final override = widget.sceneEngine.visualState.activeModelPath;
-    if (override != null && override.isNotEmpty) return override;
-    final stepModel = ArAssetRegistry.modelForStep(
-      widget.missionCode,
-      widget.stepCode,
-    );
-    return stepModel ??
-        ArAssetRegistry.primaryModelForMission(widget.missionCode);
+    var path = (override != null && override.isNotEmpty)
+        ? override
+        : (ArAssetRegistry.modelForStep(widget.missionCode, widget.stepCode) ??
+              ArAssetRegistry.primaryModelForMission(widget.missionCode));
+    // Mode 3D: prefer hi-fi export when the logical plant cell is active.
+    if (!_wantsLiveAr && path == ArAssetRegistry.sampleA) {
+      path = ArAssetRegistry.sampleAViewer;
+    }
+    return path;
   }
 
   bool get _wantsLiveAr => widget.useAr && !_liveInitFailed;
@@ -195,18 +210,33 @@ class _MissionScenePanelState extends State<MissionScenePanel>
     final selected = _hotspots.selectedId;
     if (selected != null) {
       final content = SampleAOrganelleHotspots.contentFor(selected);
-      unawaited(
-        widget.sceneEngine.setMaterialHighlight(
-          content.nodeId,
-          enabled: true,
-        ),
-      );
+      unawaited(_focusHotspotSelection(content));
     }
     if (mounted) setState(() {});
   }
 
+  /// Damaged plant cell (Sampel A): zoom 3D + highlight, popup opens via controller.
+  Future<void> _focusHotspotSelection(OrganelleHotspotContent content) async {
+    await widget.sceneEngine.setMaterialHighlight(
+      content.nodeId,
+      enabled: true,
+    );
+    if (content.id == OrganelleHotspotId.plantCell) {
+      await widget.sceneEngine.smoothZoomToTarget(
+        ArNodeIds.sampleA,
+        factor: 1.35,
+        cameraOrbit: '0deg 65deg 1.1m',
+      );
+      await _syncNodesFromVisualState();
+    }
+  }
+
   void _enableHotspots() {
     _hotspots.setEnabled(true);
+    // Don't pile a second "Petunjuk" card on top of the Mode AR HUD.
+    _hotspots.dismissIntro();
+    _introDismissTimer?.cancel();
+    _introDismissTimer = null;
   }
 
   Future<void> _probeCapabilityForUpgrade() async {
@@ -279,8 +309,10 @@ class _MissionScenePanelState extends State<MissionScenePanel>
   Future<void> _finalizePlacement() async {
     await widget.sceneEngine.initLabScene(
       labTableModelPath: ArAssetRegistry.mejaLab,
-      sampleAModelPath: ArAssetRegistry.sampleA,
+      tempatUjiModelPath: ArAssetRegistry.tempatUji,
+      sampleAModelPath: ArAssetRegistry.sampleAFor(liveAr: _wantsLiveAr),
       sampleBModelPath: ArAssetRegistry.sampleB,
+      sampleOffsetX: _sampleOffsetX,
     );
     await _syncNodesFromVisualState();
     // Mid-mission restore only: re-apply an already-active step. Fresh
@@ -294,6 +326,7 @@ class _MissionScenePanelState extends State<MissionScenePanel>
 
   @override
   void dispose() {
+    _introDismissTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _hotspots.removeListener(_onHotspotControllerChanged);
     _hotspots.dispose();
@@ -321,63 +354,77 @@ class _MissionScenePanelState extends State<MissionScenePanel>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final visual = widget.sceneEngine.visualState;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final boundedHeight = constraints.hasBoundedHeight;
-        final compactHeight = boundedHeight && constraints.maxHeight < 560;
-        final sceneFlex = compactHeight ? 6 : 7;
-        final detailFlex = compactHeight ? 4 : 3;
-
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: theme.colorScheme.outlineVariant),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
+    return ColoredBox(
+      color: const Color(0xFF1A1F24),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          MissionScenePanel.debugUsePlaceholderScene
+              ? _buildPlaceholder(theme)
+              : (_wantsLiveAr
+                    ? _buildArView(visual)
+                    : _buildModelViewer()),
+          _buildTopHud(theme),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  flex: sceneFlex,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      MissionScenePanel.debugUsePlaceholderScene
-                          ? _buildPlaceholder(theme)
-                          : (_wantsLiveAr
-                                ? _buildArView(visual)
-                                : _buildModelViewer()),
-                      _buildTopHud(theme),
-                      _buildBottomControls(theme),
-                    ],
-                  ),
-                ),
-                Flexible(
-                  flex: detailFlex,
-                  child: _buildDetailPane(theme, compactHeight: compactHeight),
-                ),
+                _buildHotspotSheet(),
+                _buildSecondaryOverlay(theme),
+                _buildBottomControls(theme),
               ],
             ),
           ),
-        );
-      },
+        ],
+      ),
+    );
+  }
+
+  /// Test-only debug / gesture affordances — hidden in production builds.
+  Widget _buildSecondaryOverlay(ThemeData theme) {
+    if (!MissionScenePanel.debugUsePlaceholderScene) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+      child: Material(
+        color: Colors.black.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(4, 2, 4, 2),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (widget.useAr) _buildDebugArControls(),
+              _buildGestureControls(theme),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
   Widget _buildTopHud(ThemeData theme) {
+    final statusLine = widget.stepLabel.trim().isNotEmpty &&
+            widget.stepLabel != '—'
+        ? '${widget.statusLabel} · ${widget.stepLabel}'
+        : widget.statusLabel;
     return SafeArea(
       bottom: false,
       child: Align(
         alignment: Alignment.topCenter,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
           child: Material(
             color: Colors.black.withValues(alpha: 0.7),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -388,7 +435,7 @@ class _MissionScenePanelState extends State<MissionScenePanel>
                         child: Text(
                           ArAssetRegistry.modeLabel(useAr: _wantsLiveAr),
                           key: const Key('mission-mode-label'),
-                          style: theme.textTheme.titleSmall?.copyWith(
+                          style: theme.textTheme.labelLarge?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
                           ),
@@ -397,45 +444,44 @@ class _MissionScenePanelState extends State<MissionScenePanel>
                       if (!_wantsLiveAr &&
                           widget.onRequestLiveAr != null &&
                           _capability?.supported == true)
-                        OutlinedButton.icon(
+                        TextButton(
                           key: const Key('mission-activate-live-ar'),
                           onPressed: widget.onRequestLiveAr,
-                          icon: const Icon(Icons.view_in_ar_rounded, size: 16),
-                          label: const Text('Mode AR'),
-                          style: OutlinedButton.styleFrom(
+                          style: TextButton.styleFrom(
                             foregroundColor: Colors.white,
-                            side: const BorderSide(color: Colors.white24),
                             visualDensity: VisualDensity.compact,
                           ),
+                          child: const Text('Mode AR'),
+                        ),
+                      if (_wantsLiveAr)
+                        IconButton(
+                          key: const Key('mission-reset-scene'),
+                          tooltip: 'Reset penempatan scene AR',
+                          onPressed: _resetScene,
+                          visualDensity: VisualDensity.compact,
+                          color: Colors.white,
+                          icon: const Icon(Icons.refresh_rounded, size: 20),
                         ),
                     ],
                   ),
-                  const SizedBox(height: 4),
                   Semantics(
                     liveRegion: true,
                     label: 'Status scene: ${widget.statusLabel}',
                     child: Text(
-                      'Status: ${widget.statusLabel}',
+                      statusLine,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.white,
+                        color: Colors.white.withValues(alpha: 0.9),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    widget.stepLabel,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.92),
-                    ),
-                  ),
-                  if (_wantsLiveAr) ...[
+                  if (_wantsLiveAr && _scanPhase != ArScanPhase.placed) ...[
                     const SizedBox(height: 2),
                     Text(
                       _scanHint,
                       key: const Key('mission-scan-hint'),
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: Colors.white70,
@@ -443,10 +489,9 @@ class _MissionScenePanelState extends State<MissionScenePanel>
                     ),
                   ],
                   if (_liveInitFailed) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
-                      'AR gagal diinisialisasi — memakai mode 3D '
-                      '(fallback). Sequence tetap sama.',
+                      'AR gagal — mode 3D (fallback).',
                       key: const Key('mission-fallback-banner'),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.errorContainer,
@@ -454,13 +499,12 @@ class _MissionScenePanelState extends State<MissionScenePanel>
                       ),
                     ),
                   ],
-                  if (widget.sequencePaused) ...[
-                    const SizedBox(height: 6),
+                  if (widget.sequencePaused && _wantsLiveAr) ...[
+                    const SizedBox(height: 4),
                     Semantics(
                       liveRegion: true,
                       child: Text(
-                        'Pelacakan AR hilang — sequence dijeda. Gerakkan '
-                        'perangkat perlahan hingga tracking pulih.',
+                        'Pelacakan AR hilang — sequence dijeda.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.errorContainer,
                           fontWeight: FontWeight.w700,
@@ -469,24 +513,16 @@ class _MissionScenePanelState extends State<MissionScenePanel>
                     ),
                   ],
                   if (_arError != null) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
                       _arError!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.errorContainer,
                       ),
                     ),
                   ],
-                  if (_selectedStructure != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Struktur dipilih: $_selectedStructure',
-                      key: const Key('mission-selected-structure'),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.white70,
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -494,120 +530,61 @@ class _MissionScenePanelState extends State<MissionScenePanel>
         ),
       ),
     );
+  }
+
+  void _onRunStepPressed() {
+    // Clear stacked observation UI so step visuals stay readable.
+    _hotspots.closePopup();
+    _hotspots.dismissIntro();
+    widget.onRunStep();
   }
 
   Widget _buildBottomControls(ThemeData theme) {
     return SafeArea(
       top: false,
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          child: Material(
-            color: Colors.black.withValues(alpha: 0.72),
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Semantics(
-                      button: true,
-                      enabled: _canRunStep,
-                      label: 'Jalankan langkah scene berikutnya',
-                      child: FilledButton.tonal(
-                        key: const Key('mission-run-step'),
-                        onPressed: _canRunStep ? widget.onRunStep : null,
-                        style: FilledButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        child: const Text('Jalankan Langkah'),
-                      ),
-                    ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: Material(
+          color: Colors.black.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Semantics(
+              button: true,
+              enabled: _canRunStep,
+              label: 'Jalankan langkah scene berikutnya',
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.tonal(
+                  key: const Key('mission-run-step'),
+                  onPressed: _canRunStep ? _onRunStepPressed : null,
+                  style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
                   ),
-                  if (_wantsLiveAr) ...[
-                    const SizedBox(width: 8),
-                    Semantics(
-                      button: true,
-                      label: 'Reset penempatan scene AR',
-                      child: OutlinedButton(
-                        key: const Key('mission-reset-scene'),
-                        onPressed: _resetScene,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(color: Colors.white24),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        child: const Text('Reset'),
-                      ),
-                    ),
-                  ],
-                ],
+                  child: const Text('Jalankan Langkah'),
+                ),
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailPane(ThemeData theme, {required bool compactHeight}) {
-    return Container(
-      color: theme.colorScheme.surface,
-      child: DefaultTabController(
-        length: 1,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                children: [
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: compactHeight ? 180 : 220,
-                    ),
-                    child: SingleChildScrollView(
-                      child: _buildHotspotSheet(),
-                    ),
-                  ),
-                  Text(
-                    _wantsLiveAr
-                        ? 'Arahkan kamera ke permukaan datar hingga bidang '
-                              'terdeteksi, lalu ketuk untuk menempatkan Meja '
-                              'Laboratorium beserta Sampel A dan Sampel B.'
-                        : 'Seret untuk memutar, cubit untuk zoom. Setelah meja '
-                              'dan kedua sampel tampil, jalankan langkah '
-                              'sequence untuk mengubah fokus.',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  if (MissionScenePanel.debugUsePlaceholderScene &&
-                      widget.useAr) ...[
-                    const SizedBox(height: 8),
-                    _buildDebugArControls(),
-                  ],
-                  if (_scanPhase == ArScanPhase.placed || !_wantsLiveAr) ...[
-                    const SizedBox(height: 8),
-                    _buildGestureControls(theme),
-                  ],
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );
   }
 
   Widget _buildGestureControls(ThemeData theme) {
+    final buttonStyle = TextButton.styleFrom(
+      foregroundColor: Colors.white,
+      visualDensity: VisualDensity.compact,
+    );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 0),
       child: Wrap(
-        spacing: 8,
-        runSpacing: 4,
+        spacing: 4,
+        runSpacing: 0,
         children: [
           TextButton(
             key: const Key('mission-gesture-pinch-out'),
+            style: buttonStyle,
             onPressed: widget.sequencePaused
                 ? null
                 : () => _adjustScale(1.15),
@@ -615,6 +592,7 @@ class _MissionScenePanelState extends State<MissionScenePanel>
           ),
           TextButton(
             key: const Key('mission-gesture-pinch-in'),
+            style: buttonStyle,
             onPressed: widget.sequencePaused
                 ? null
                 : () => _adjustScale(1 / 1.15),
@@ -622,16 +600,19 @@ class _MissionScenePanelState extends State<MissionScenePanel>
           ),
           TextButton(
             key: const Key('mission-gesture-rotate'),
+            style: buttonStyle,
             onPressed: widget.sequencePaused ? null : () => _nudgeRotation(),
             child: const Text('Putar'),
           ),
           TextButton(
             key: const Key('mission-gesture-reset-transform'),
+            style: buttonStyle,
             onPressed: widget.sequencePaused ? null : _resetTransform,
             child: const Text('Kembali ke posisi awal'),
           ),
           TextButton(
             key: const Key('mission-tap-chloroplast'),
+            style: buttonStyle,
             onPressed: widget.sequencePaused
                 ? null
                 : () => _selectStructure('kloroplas'),
@@ -639,6 +620,7 @@ class _MissionScenePanelState extends State<MissionScenePanel>
           ),
           TextButton(
             key: const Key('mission-tap-vacuole'),
+            style: buttonStyle,
             onPressed: widget.sequencePaused
                 ? null
                 : () => _selectStructure('vakuola'),
@@ -646,6 +628,7 @@ class _MissionScenePanelState extends State<MissionScenePanel>
           ),
           TextButton(
             key: const Key('mission-tap-membrane'),
+            style: buttonStyle,
             onPressed: widget.sequencePaused
                 ? null
                 : () => _selectStructure('membran'),
@@ -654,7 +637,9 @@ class _MissionScenePanelState extends State<MissionScenePanel>
           if (_wantsLiveAr && _scanPhase == ArScanPhase.placed)
             Text(
               'Ketuk bidang lagi untuk reposisi (anchor baru).',
-              style: theme.textTheme.bodySmall,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: Colors.white70,
+              ),
             ),
         ],
       ),
@@ -684,7 +669,6 @@ class _MissionScenePanelState extends State<MissionScenePanel>
   }
 
   void _selectStructure(String name) {
-    setState(() => _selectedStructure = name);
     if (name == 'kloroplas') {
       // Debug affordance shares the observation hotspot path (no sequence).
       if (_hotspots.enabled) {
@@ -720,11 +704,10 @@ class _MissionScenePanelState extends State<MissionScenePanel>
 
   String get _scanHint {
     return switch (_scanPhase) {
-      ArScanPhase.scanning =>
-        'Pindai permukaan meja untuk memunculkan Laboratorium Forensik Sel.',
       ArScanPhase.planeReady => 'Bidang terdeteksi — ketuk untuk menempatkan.',
       ArScanPhase.placed =>
         'Meja Laboratorium + Sampel A & B ditempatkan. Jalankan langkah untuk memulai misi.',
+      _ => '',
     };
   }
 
@@ -845,92 +828,75 @@ class _MissionScenePanelState extends State<MissionScenePanel>
 
   Widget _buildModelViewer() {
     final visual = widget.sceneEngine.visualState;
-    final secondary = visual.secondaryModelPath;
-    final showLabPair = secondary != null && secondary.isNotEmpty;
+    final step = widget.stepCode;
+
+    // Web: load scene GLB per step — each file is the full scene (table + cells)
+    // with the relevant mesh material baked in Blender.
+    // ponytail: scene-misi*.glb files don't exist yet; falls back to scene-1.glb.
+    final glbPath = switch (step) {
+      'glow_organelles' => 'assets/ar_models/scenes/scene-misi1-kloroplas.glb',
+      'play_shrink_animation' => 'assets/ar_models/scenes/scene-misi1-vakuola.glb',
+      'zoom_membrane' => 'assets/ar_models/scenes/scene-misi2-membran.glb',
+      'show_both_samples' || 'mark_sample_b' =>
+        'assets/ar_models/scenes/scene-misi3-dinding.glb',
+      _ => ArAssetRegistry.scene1,
+    };
+    // Fall back to scene-1.glb if the step-specific file doesn't exist yet.
+    final src = kIsWeb ? glbPath.replaceAll(' ', '%20') : glbPath;
+
+    // Camera orbit zoom per step.
+    final orbit = switch (step) {
+      'zoom_internal' || 'glow_organelles' || 'play_shrink_animation' =>
+        '-20deg 70deg 75%',
+      'zoom_membrane' => '20deg 70deg 75%',
+      'show_both_samples' || 'mark_sample_b' => '0deg 75deg 95%',
+      _ => '0deg 75deg 115%',
+    };
+
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (showLabPair)
-          Row(
-            children: [
-              Expanded(
-                child: ModelViewer(
-                  key: ValueKey('mv-a-${widget.missionCode}-$_activeAsset'),
-                  src: _activeAsset,
-                  alt: 'Sampel A — sel tumbuhan',
-                  ar: false,
-                  autoRotate: true,
-                  cameraControls: true,
-                  disableZoom: false,
-                  cameraOrbit: ArAssetRegistry.cameraOrbitForStep(
-                    widget.stepCode,
-                  ),
-                  backgroundColor: const Color(0xFF1A1F24),
-                  loading: Loading.eager,
-                  relatedCss: 'body { margin: 0; background: #1A1F24; }',
-                ),
-              ),
-              Expanded(
-                child: ModelViewer(
-                  key: ValueKey('mv-b-${widget.missionCode}-$secondary'),
-                  src: secondary,
-                  alt: 'Sampel B — sel hewan',
-                  ar: false,
-                  autoRotate: true,
-                  cameraControls: true,
-                  disableZoom: false,
-                  cameraOrbit: ArAssetRegistry.cameraOrbitForStep(
-                    widget.stepCode,
-                  ),
-                  backgroundColor: const Color(0xFF1A1F24),
-                  loading: Loading.eager,
-                  relatedCss: 'body { margin: 0; background: #1A1F24; }',
-                ),
-              ),
-            ],
-          )
-        else
-          ModelViewer(
-            // Keep viewer mounted across step changes when possible — key by
-            // mission only so sequence does not feel like a new page.
-            key: ValueKey('mv-${widget.missionCode}-$_activeAsset'),
-            src: _activeAsset,
-            alt: 'Model 3D misi ${widget.missionCode}',
-            ar: false,
-            autoRotate: true,
-            cameraControls: true,
-            disableZoom: false,
-            cameraOrbit: ArAssetRegistry.cameraOrbitForStep(widget.stepCode),
-            backgroundColor: const Color(0xFF1A1F24),
-            loading: Loading.eager,
-            relatedCss: 'body { margin: 0; background: #1A1F24; }',
-          ),
-        if (visual.labTableModelPath != null)
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Text(
-                'Meja Laboratorium',
-                key: const Key('mission-lab-table-label'),
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ArSceneOverlayLayer(
-          effect: visual.overlay,
-          highlightTarget: visual.highlightTarget,
-          opacity: visual.opacity,
-          dualSamples: visual.secondaryModelPath != null,
+        ModelViewer(
+          key: ValueKey('mv-lab-$step'),
+          src: src,
+          alt: 'Meja laboratorium forensik sel',
+          ar: false,
+          autoRotate: false,
+          cameraControls: true,
+          disableZoom: false,
+          cameraOrbit: orbit,
+          backgroundColor: const Color(0xFF1A1F24),
+          loading: Loading.eager,
+          relatedCss: 'body{margin:0;background:#1A1F24}',
         ),
-        _buildHotspotLayer(
-          dualSamples: visual.secondaryModelPath != null,
-        ),
+        if (_wantsLiveAr)
+          ArSceneOverlayLayer(
+            effect: visual.overlay,
+            highlightTarget: visual.highlightTarget,
+            opacity: visual.opacity,
+            dualSamples: false,
+          ),
+        _buildModelTapLayer(dualSamples: false),
       ],
+    );
+  }
+
+  Widget _buildModelTapLayer({required bool dualSamples}) {
+    return Align(
+      alignment: dualSamples ? Alignment.centerLeft : Alignment.center,
+      child: FractionallySizedBox(
+        widthFactor: dualSamples ? 0.5 : 0.72,
+        heightFactor: 0.72,
+        child: Semantics(
+          button: true,
+          label: SampleAOrganelleHotspots.plantCell.semanticsLabel,
+          child: GestureDetector(
+            key: const Key('model-viewer-plant-cell-tap'),
+            behavior: HitTestBehavior.translucent,
+            onTap: () => _hotspots.select(OrganelleHotspotId.plantCell),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1018,6 +984,8 @@ class _MissionScenePanelState extends State<MissionScenePanel>
       if (_scanPhase == ArScanPhase.placed) return;
       if (count > 0) {
         setState(() => _scanPhase = ArScanPhase.planeReady);
+        // Auto-place on first detected plane — no tap needed.
+        unawaited(_autoPlaceOnFirstPlane());
       }
     };
     session.onError = (message) {
@@ -1077,6 +1045,29 @@ class _MissionScenePanelState extends State<MissionScenePanel>
         }());
       }
     }
+  }
+
+  Future<void> _autoPlaceOnFirstPlane() async {
+    if (_scanPhase == ArScanPhase.placed) return;
+    if (_anchors == null || _session == null) return;
+    // Place at world origin of the detected plane.
+    // ponytail: uses (0,0,0); upgrade to center hit-test when plugin exposes screenHitTest.
+    final anchor = ARPlaneAnchor(
+      transformation: Matrix4.identity(),
+    );
+    final added = await _anchors!.addAnchor(anchor);
+    if (added != true || !mounted) return;
+    await widget.sceneEngine.place(const ArPlacement(x: 0, y: 0, z: 0));
+    _lifecycle.confirmRelocalized();
+    widget.sceneEngine.updateTracking(ArTrackingState.tracking);
+    setState(() {
+      _placedAnchor = anchor;
+      _scanPhase = ArScanPhase.placed;
+      _liveInitFailed = false;
+      _arError = null;
+    });
+    widget.onPlacementChanged?.call(true);
+    await _finalizePlacement();
   }
 
   Future<void> _onPlaneTapped(List<ARHitTestResult> hits) async {
@@ -1149,6 +1140,12 @@ class _MissionScenePanelState extends State<MissionScenePanel>
     if (_labTableNode != null) {
       objects.removeNode(_labTableNode!);
     }
+    if (_tempatUjiANode != null) {
+      objects.removeNode(_tempatUjiANode!);
+    }
+    if (_tempatUjiBNode != null) {
+      objects.removeNode(_tempatUjiBNode!);
+    }
     if (_placedNode != null) {
       objects.removeNode(_placedNode!);
     }
@@ -1191,11 +1188,16 @@ class _MissionScenePanelState extends State<MissionScenePanel>
 
   Vector3 _liveScaleFor(String? nodeId) {
     final seq = _sequenceScaleFor(nodeId) ?? ArVec3.one;
+    final base = switch (nodeId) {
+      ArNodeIds.labTable => _labTableBaseScale,
+      ArNodeIds.tempatUjiA || ArNodeIds.tempatUjiB => _tempatUjiBaseScale,
+      _ => _baseScale,
+    };
     // Prefer component-wise so non-uniform director scales still apply.
     return Vector3(
-      _baseScale * _gestureScale * seq.x,
-      _baseScale * _gestureScale * seq.y,
-      _baseScale * _gestureScale * seq.z,
+      base * _gestureScale * seq.x,
+      base * _gestureScale * seq.y,
+      base * _gestureScale * seq.z,
     );
   }
 
@@ -1237,6 +1239,26 @@ class _MissionScenePanelState extends State<MissionScenePanel>
       }
     }
 
+    await _syncTempatUjiNode(
+      objects: objects,
+      anchor: anchor,
+      visual: visual,
+      nodeId: ArNodeIds.tempatUjiA,
+      current: _tempatUjiANode,
+      assign: (node) => _tempatUjiANode = node,
+    );
+    await _syncTempatUjiNode(
+      objects: objects,
+      anchor: anchor,
+      visual: visual,
+      nodeId: ArNodeIds.tempatUjiB,
+      current: _tempatUjiBNode,
+      assign: (node) => _tempatUjiBNode = node,
+    );
+    final trayPathA = visual.nodeModels[ArNodeIds.tempatUjiA];
+    final trayPathB = visual.nodeModels[ArNodeIds.tempatUjiB];
+    _tempatUjiAssetPath = trayPathA ?? trayPathB;
+
     final desiredPrimary = visual.activeModelPath ?? _activeAsset;
     if (_placedAssetPath != desiredPrimary || _placedNode == null) {
       await _replacePrimaryModel(desiredPrimary);
@@ -1257,7 +1279,7 @@ class _MissionScenePanelState extends State<MissionScenePanel>
       }
       final sampleBPos =
           visual.nodePosition[ArNodeIds.sampleB] ??
-          ArVec3(visual.secondaryOffsetX, 0.03, 0);
+          ArVec3(visual.secondaryOffsetX, 0.76, -0.30);
       final node = await _createNodeForAsset(
         secondary,
         position: _vecFromAr(sampleBPos),
@@ -1273,6 +1295,44 @@ class _MissionScenePanelState extends State<MissionScenePanel>
     }
 
     if (mounted) setState(() {});
+  }
+
+  Future<void> _syncTempatUjiNode({
+    required ARObjectManager objects,
+    required ARPlaneAnchor anchor,
+    required ArSceneVisualState visual,
+    required String nodeId,
+    required ARNode? current,
+    required void Function(ARNode?) assign,
+  }) async {
+    final path = visual.nodeModels[nodeId];
+    final visible = visual.visibleNodes[nodeId] ?? (path != null);
+    if (path == null || !visible) {
+      if (current != null) {
+        objects.removeNode(current);
+        assign(null);
+      }
+      return;
+    }
+    final existing = current;
+    if (existing != null && _tempatUjiAssetPath == path) {
+      existing.scale = _liveScaleFor(nodeId);
+      existing.eulerAngles = Vector3(0, _gestureRotationY, 0);
+      existing.position = _vecFromAr(
+        visual.nodePosition[nodeId] ?? ArVec3.zero,
+      );
+      return;
+    }
+    if (existing != null) {
+      objects.removeNode(existing);
+    }
+    final node = await _createNodeForAsset(
+      path,
+      position: _vecFromAr(visual.nodePosition[nodeId] ?? ArVec3.zero),
+      nodeId: nodeId,
+    );
+    final ok = await objects.addNode(node, planeAnchor: anchor);
+    assign(ok == true ? node : null);
   }
 
   Vector3 _vecFromAr(ArVec3 v) => Vector3(v.x, v.y, v.z);
@@ -1304,6 +1364,12 @@ class _MissionScenePanelState extends State<MissionScenePanel>
           _placedAssetPath = assetPath;
           _arError = null;
         });
+      } else if (mounted) {
+        setState(() {
+          _arError =
+              'Gagal memuat model GLB ke scene AR '
+              '(${assetPath.split('/').last}).';
+        });
       }
     } catch (error) {
       if (mounted) setState(() => _arError = 'Gagal mengganti model: $error');
@@ -1319,6 +1385,17 @@ class _MissionScenePanelState extends State<MissionScenePanel>
       final labPos = visual.nodePosition[ArNodeIds.labTable] ?? ArVec3.zero;
       lab.position = _vecFromAr(labPos);
     }
+    void applyTray(ARNode? node, String nodeId) {
+      if (node == null) return;
+      node.scale = _liveScaleFor(nodeId);
+      node.eulerAngles = Vector3(0, _gestureRotationY, 0);
+      node.position = _vecFromAr(
+        visual.nodePosition[nodeId] ?? ArVec3.zero,
+      );
+    }
+
+    applyTray(_tempatUjiANode, ArNodeIds.tempatUjiA);
+    applyTray(_tempatUjiBNode, ArNodeIds.tempatUjiB);
     final primary = _placedNode;
     if (primary != null) {
       primary.scale = _liveScaleFor(ArNodeIds.primary);
@@ -1336,7 +1413,7 @@ class _MissionScenePanelState extends State<MissionScenePanel>
       secondary.eulerAngles = Vector3(0, _gestureRotationY, 0);
       final sampleBPos =
           visual.nodePosition[ArNodeIds.sampleB] ??
-          ArVec3(visual.secondaryOffsetX, 0.03, 0);
+          ArVec3(visual.secondaryOffsetX, 0.76, -0.30);
       secondary.position = _vecFromAr(sampleBPos);
     }
   }
@@ -1358,16 +1435,18 @@ class _MissionScenePanelState extends State<MissionScenePanel>
     setState(() {
       _placedAnchor = null;
       _labTableNode = null;
+      _tempatUjiANode = null;
+      _tempatUjiBNode = null;
       _placedNode = null;
       _secondaryNode = null;
       _labTableAssetPath = null;
+      _tempatUjiAssetPath = null;
       _placedAssetPath = null;
       _secondaryAssetPath = null;
       _scanPhase = ArScanPhase.scanning;
       _arError = null;
       _gestureScale = 1;
       _gestureRotationY = 0;
-      _selectedStructure = null;
     });
     widget.onPlacementChanged?.call(false);
   }

@@ -27,6 +27,12 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- Force hybrid composition so ar_flutter_plugin_2 arobjects channel
+                 registers correctly. SurfaceProducer (virtual display) breaks
+                 the BinaryMessenger binding for platform view method channels. -->
+            <meta-data
+                android:name="io.flutter.embedded_views_preview"
+                android:value="true" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>

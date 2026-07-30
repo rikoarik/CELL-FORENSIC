@@ -18,7 +18,9 @@ abstract final class Misi1Visuals {
     await engine.setSecondaryModel(null);
     await engine.showNode(ArNodeIds.primary);
     await engine.showNode(ArNodeIds.labTable);
+    await engine.showNode(ArNodeIds.tempatUjiA);
     await engine.hideNode(ArNodeIds.sampleB);
+    await engine.hideNode(ArNodeIds.tempatUjiB);
     await engine.setNodeScale(ArNodeIds.primary, ArVec3.one);
     await engine.setNodeScale(ArNodeIds.chloroplast, ArVec3.one);
     await engine.setNodeScale(ArNodeIds.vacuole, ArVec3.one);

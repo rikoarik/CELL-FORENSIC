@@ -63,6 +63,8 @@ class AssistantViewModel extends ChangeNotifier {
 
   final List<ChatMessage> _messages = <ChatMessage>[];
   bool _busy = false;
+  bool _lastReplyUsedCloud = false;
+  bool _cloudUnavailable = false;
 
   /// Riwayat percakapan yang tidak dapat dimutasi dari luar.
   List<ChatMessage> get messages => List.unmodifiable(_messages);
@@ -70,6 +72,15 @@ class AssistantViewModel extends ChangeNotifier {
   bool get hasMessages => _messages.isNotEmpty;
 
   bool get isBusy => _busy;
+
+  /// Whether the most recent assistant turn came from the cloud proxy.
+  bool get lastReplyUsedCloud => _lastReplyUsedCloud;
+
+  /// True after a cloud attempt failed (Edge secret / network / parse).
+  bool get cloudUnavailable => _cloudUnavailable;
+
+  /// Cloud proxy is wired (may still fail at request time).
+  bool get cloudConfigured => aiClient != null;
 
   /// Last resolved AR action from the most recent assistant turn (tests).
   String? lastArAction;
@@ -106,16 +117,19 @@ class AssistantViewModel extends ChangeNotifier {
         text: local.response,
         sequenceCode: null,
         arAction: ArActionWhitelist.none,
+        fromCloud: false,
       );
       return;
     }
 
     final client = aiClient;
     if (client == null) {
+      _cloudUnavailable = true;
       _pushAssistant(
         text: local.response,
         sequenceCode: local.sequenceCode,
         arAction: ArActionWhitelist.none,
+        fromCloud: false,
       );
       return;
     }
@@ -127,18 +141,23 @@ class AssistantViewModel extends ChangeNotifier {
       ai = await client.ask(message: question, mission: missionNumber);
     } catch (error, stack) {
       logAiAssistantFailure(error, stack);
+      _cloudUnavailable = true;
     } finally {
       _busy = false;
     }
 
     if (ai != null) {
+      _cloudUnavailable = false;
       _applyAiResponse(ai);
     } else {
       // Offline-equivalent fallback: IntentMatch.sequenceCode drives AR.
       _pushAssistant(
-        text: local.response,
+        text:
+            '${local.response}\n\n'
+            '(Asisten cloud tidak tersedia — petunjuk lokal.)',
         sequenceCode: local.sequenceCode,
         arAction: ArActionWhitelist.none,
+        fromCloud: false,
       );
     }
   }
@@ -153,6 +172,7 @@ class AssistantViewModel extends ChangeNotifier {
     _pushAssistant(
       text: ai.message,
       arAction: action,
+      fromCloud: true,
     );
   }
 
@@ -160,7 +180,9 @@ class AssistantViewModel extends ChangeNotifier {
     required String text,
     String? sequenceCode,
     String? arAction,
+    bool fromCloud = false,
   }) {
+    _lastReplyUsedCloud = fromCloud;
     final action = arAction ?? ArActionWhitelist.none;
     lastArAction = action;
     lastSequenceCode = sequenceCode;

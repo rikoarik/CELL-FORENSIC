@@ -108,12 +108,16 @@ class OrganelleHotspotLayer extends StatelessWidget {
 
   List<Widget> _selectionGlows(ArOverlayFrame frame) {
     final selected = controller.selectedId;
-    if (selected == null) return const [];
+    // Skip whole-cell glow — it paints huge screen-space rings that float
+    // away from the (much smaller) live GLB and look like broken overlays.
+    if (selected == null || selected == OrganelleHotspotId.plantCell) {
+      return const [];
+    }
     final center = _anchorFor(selected, frame);
     final radius = switch (selected) {
       OrganelleHotspotId.plantCell => frame.modelRadius * 1.05,
-      OrganelleHotspotId.vacuole => frame.modelRadius * 0.5,
-      OrganelleHotspotId.chloroplast => frame.modelRadius * 0.42,
+      OrganelleHotspotId.vacuole => frame.modelRadius * 0.35,
+      OrganelleHotspotId.chloroplast => frame.modelRadius * 0.28,
     };
     final color = switch (selected) {
       OrganelleHotspotId.plantCell => const Color(0xFFFACC15),

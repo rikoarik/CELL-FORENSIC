@@ -4,9 +4,9 @@ import 'package:cell_forensic/ar/organelle_label_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('E0-01 inventory has 21 GLB definitions', () {
-    expect(ArAssetManifest.allAssets, hasLength(21));
-    expect(ArAssetRegistry.inventoriedCount, 21);
+  test('E0-01 inventory has 25 GLB definitions', () {
+    expect(ArAssetManifest.allAssets, hasLength(25));
+    expect(ArAssetRegistry.inventoriedCount, 25);
   });
 
   test('E0-02 every asset is GLB with non-negative triangle count', () {

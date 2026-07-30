@@ -6,38 +6,10 @@ import 'package:flutter/material.dart';
 class MobileHome extends StatelessWidget {
   const MobileHome({super.key});
 
-  Future<void> _openJourneySheet(BuildContext context) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.94,
-        minChildSize: 0.8,
-        maxChildSize: 0.98,
-        expand: false,
-        builder: (context, scrollController) => DecoratedBox(
-          decoration: const BoxDecoration(
-            color: DesignTokens.surface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 10),
-              Container(
-                width: 44,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: DesignTokens.border,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-              const SizedBox(height: 10),
-              const Expanded(child: JourneyHost()),
-            ],
-          ),
-        ),
+  void _openJourney(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const JourneyHost(),
       ),
     );
   }
@@ -130,29 +102,11 @@ class MobileHome extends StatelessWidget {
                       Semantics(
                         button: true,
                         label: 'Masuk ke sesi praktikum',
-                        child: FilledButton.icon(
+                        child: FilledButton(
                           key: const Key('student-enter-session'),
-                          onPressed: () => _openJourneySheet(context),
-                          icon: const Icon(Icons.login_rounded),
-                          label: const Text('Masuk Sesi'),
+                          onPressed: () => _openJourney(context),
+                          child: const Text('Masuk Sesi'),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.center,
-                        child: FloatingActionButton.extended(
-                          key: const Key('student-enter-session-fab'),
-                          heroTag: 'student-enter-session-fab',
-                          onPressed: () => _openJourneySheet(context),
-                          icon: const Icon(Icons.groups_2_rounded),
-                          label: const Text('Buka Panel Sesi'),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Panel sesi akan muncul penuh agar input kode dan setup kelompok lebih lega.',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
                   ),

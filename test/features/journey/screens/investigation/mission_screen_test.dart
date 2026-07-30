@@ -11,12 +11,14 @@ const _runStepKey = Key('mission-run-step');
 const _completeMissionKey = Key('mission-complete');
 const _assistantInputKey = Key('mission-assistant-input');
 const _assistantSendKey = Key('mission-assistant-send');
+const _assistantFabKey = Key('assistant-fab');
+const _logbookFabKey = Key('mission-logbook-toggle');
 
 StudentJourney _investigatingJourney({bool arSupported = false}) {
   return StudentJourney(content: buildLocalContentPack())
     ..completeDeviceCheck(arSupported: arSupported)
     ..joinWithGroup(groupName: 'Tim A', leaderName: 'Budi')
-    // Scene 1 placement unlocks missions; does not auto-start Misi 1.
+    // Scene 1 placement unlocks missions and auto-starts Misi 1.
     ..markLabPlaced();
 }
 
@@ -40,6 +42,16 @@ Future<void> _runSequenceToCompletion(
   }
 }
 
+Future<void> _openAssistant(WidgetTester tester) async {
+  await tester.tap(find.byKey(_assistantFabKey));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openLogbook(WidgetTester tester) async {
+  await tester.tap(find.byKey(_logbookFabKey));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUp(() {
     MissionScenePanel.debugUsePlaceholderScene = true;
@@ -50,21 +62,28 @@ void main() {
     MissionScreen.intentStepDwell = const Duration(milliseconds: 1000);
   });
 
-  testWidgets('menampilkan judul misi / Scene 1', (tester) async {
+  testWidgets('menampilkan judul misi / Misi 1', (tester) async {
     final journey = _investigatingJourney()..startMissionFromIntent(1);
     await tester.pumpWidget(_wrap(MissionScreen(journey: journey)));
 
-    expect(find.text(journey.activeMission.title), findsOneWidget);
-    expect(find.textContaining('Fokus ke Sampel A'), findsOneWidget);
+    expect(find.text(journey.activeMission.title), findsWidgets);
+    expect(find.textContaining('Misi 1'), findsWidgets);
+    expect(find.byKey(_assistantFabKey), findsOneWidget);
+    expect(find.byKey(_logbookFabKey), findsOneWidget);
+
+    await _openAssistant(tester);
     expect(find.byKey(const Key('mission-assistant-mic')), findsOneWidget);
     expect(find.textContaining('Tanya Asisten AI'), findsWidgets);
   });
 
-  testWidgets('panel AR fallback mulai dari laboratorium siap', (tester) async {
+  testWidgets('panel AR fallback mulai dari Misi 1 setelah place', (tester) async {
     final journey = _investigatingJourney();
     await tester.pumpWidget(_wrap(MissionScreen(journey: journey)));
 
-    expect(find.textContaining('Laboratorium siap'), findsWidgets);
+    // markLabPlaced auto-starts Misi 1 — chrome shows mission title, not Scene 1.
+    expect(find.textContaining('Misi 1'), findsWidgets);
+    expect(find.text(journey.activeMission.title), findsWidgets);
+    expect(find.textContaining('Menyiapkan'), findsWidgets);
   });
 
   testWidgets(
@@ -95,7 +114,7 @@ void main() {
   );
 
   testWidgets(
-    'Selesaikan Misi menandai observasi selesai tanpa lompat linear',
+    'Selesaikan Misi menyelesaikan misi aktif lalu lanjut ke misi berikutnya',
     (tester) async {
       final journey = _investigatingJourney()..startMissionFromIntent(1);
       await tester.pumpWidget(_wrap(MissionScreen(journey: journey)));
@@ -106,10 +125,11 @@ void main() {
       await tester.tap(find.byKey(_completeMissionKey));
       await tester.pumpAndSettle();
 
-      expect(journey.activeMission.code, 'MISI-1');
       expect(journey.missionStatus(1), MissionStatus.completed);
+      expect(journey.missionStatus(2), MissionStatus.running);
+      expect(journey.activeMission.code, 'MISI-2');
       expect(
-        find.textContaining('Misi 1 — Analisis'),
+        find.textContaining('Misi 2 — Analisis'),
         findsOneWidget,
       );
     },
@@ -119,6 +139,7 @@ void main() {
     final journey = _investigatingJourney();
     await tester.pumpWidget(_wrap(MissionScreen(journey: journey)));
 
+    await _openAssistant(tester);
     await tester.ensureVisible(find.byKey(_assistantInputKey));
     await tester.enterText(
       find.byKey(_assistantInputKey),
@@ -142,6 +163,7 @@ void main() {
     final journey = _investigatingJourney();
     await tester.pumpWidget(_wrap(MissionScreen(journey: journey)));
 
+    await _openAssistant(tester);
     await tester.ensureVisible(find.byKey(_assistantInputKey));
     await tester.enterText(find.byKey(_assistantInputKey), 'apa itu organel x');
     await tester.ensureVisible(find.byKey(_assistantSendKey));
@@ -157,6 +179,7 @@ void main() {
     final journey = _investigatingJourney();
     await tester.pumpWidget(_wrap(MissionScreen(journey: journey)));
 
+    await _openAssistant(tester);
     await tester.ensureVisible(find.byKey(_assistantInputKey));
     await tester.enterText(find.byKey(_assistantInputKey), 'apa warna langit');
     await tester.ensureVisible(find.byKey(_assistantSendKey));
@@ -170,8 +193,7 @@ void main() {
     final journey = _investigatingJourney()..startMissionFromIntent(1);
     await tester.pumpWidget(_wrap(MissionScreen(journey: journey)));
 
-    await tester.tap(find.byKey(const Key('mission-logbook-toggle')));
-    await tester.pump();
+    await _openLogbook(tester);
 
     const answer = 'Sel tampak mengkerut';
     await tester.enterText(find.byKey(const Key('logbook-field-0')), answer);
@@ -190,12 +212,13 @@ void main() {
     await tester.pumpWidget(_wrap(MissionScreen(journey: journey)));
     await tester.pump();
 
+    await _openAssistant(tester);
     await tester.enterText(
       find.byKey(_assistantInputKey),
       'draft sebelum upgrade',
     );
-    await tester.tap(find.byKey(const Key('mission-logbook-toggle')));
-    await tester.pump();
+    await tester.tap(find.byKey(const Key('assistant-tab-logbook')));
+    await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('logbook-field-0')),
       'catatan sebelum upgrade',
@@ -215,7 +238,7 @@ void main() {
     );
 
     await tester.tap(find.byKey(const Key('assistant-tab-chat')));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('assistant-tab-view-chat')), findsOneWidget);
     expect(
       tester.widget<TextField>(find.byKey(_assistantInputKey)).controller?.text,

@@ -64,11 +64,7 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/ar_models/Meja/
-    - assets/ar_models/SelTumbuhan/
-    - assets/ar_models/SelTumbuhan/SelTumbuhhanSolo/
-    - assets/ar_models/SelHewan/
-    - assets/ar_models/SelHewan/RantaiProtein/
+    - assets/ar_models/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

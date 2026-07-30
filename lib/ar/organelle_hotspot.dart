@@ -80,7 +80,8 @@ abstract final class SampleAOrganelleHotspots {
     instruction: 'Ketuk sel atau organel yang ingin diperiksa.',
   );
 
-  /// Whole-cell scan result (example: plant cell / Sampel A).
+  /// Whole-cell scan result (contoh: sel tumbuhan rusak / Sampel A).
+  /// Popup terbuka saat siswa ketuk sel di TempatUji A — 3D tetap di scene.
   static const plantCell = OrganelleHotspotContent(
     id: OrganelleHotspotId.plantCell,
     title: 'Hasil Pemindaian — Sel Tumbuhan',
@@ -95,7 +96,7 @@ abstract final class SampleAOrganelleHotspots {
         'Apa dampaknya bagi energi dan tekanan internal sel jika kloroplas '
         'dan vakuola raksasa tidak berfungsi?',
     logbookPromptSubstring: 'Organel yang tampak rusak',
-    nodeId: ArNodeIds.primary,
+    nodeId: ArNodeIds.sampleA,
   );
 
   static const chloroplast = OrganelleHotspotContent(

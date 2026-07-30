@@ -217,6 +217,11 @@ void main() {
   testWidgets('hotspot select does not complete mission or run sequence', (
     tester,
   ) async {
+    MissionScenePanel.debugUsePlaceholderScene = true;
+    addTearDown(() {
+      MissionScenePanel.debugUsePlaceholderScene = false;
+    });
+
     final journey = _journey()..startMissionFromIntent(1);
     final beforeStep = journey.sequenceStepIndex;
     final engine = FakeArSceneEngine();
