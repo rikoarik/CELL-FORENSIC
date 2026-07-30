@@ -373,11 +373,17 @@ class _MissionScenePanelState extends State<MissionScenePanel>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildHotspotSheet(),
                 _buildSecondaryOverlay(theme),
                 _buildBottomControls(theme),
               ],
             ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            // Sit above the bottom controls bar (~72dp) + system nav inset.
+            bottom: 72 + MediaQuery.viewPaddingOf(context).bottom,
+            child: _buildHotspotSheet(),
           ),
         ],
       ),

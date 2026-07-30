@@ -17,7 +17,7 @@ class ArAssetRegistry {
   static bool get organelleLabelsSafe =>
       OrganelleLabelMap.assertProvisionalRules();
 
-  static const scene1 = 'assets/ar_models/scene-1.glb';
+  static const scene1 = 'assets/ar_models/scenes/scene-misi2-membran.glb';
   static const mejaLab = 'assets/ar_models/Meja/MejaLab_Putih.glb';
   /// Specimen trays that sit on the lab table under Sample A / Sample B.
   static const tempatUji = 'assets/ar_models/Meja/TempatUji.glb';

@@ -7,8 +7,6 @@ import 'package:cell_forensic/features/journey/screens/intro/join_group_screen.d
 import 'package:cell_forensic/features/journey/screens/intro/onboarding_screen.dart';
 import 'package:cell_forensic/features/journey/screens/investigation/conclusion_screen.dart';
 import 'package:cell_forensic/features/journey/screens/investigation/mission_screen.dart';
-import 'package:cell_forensic/features/journey/screens/stations/results_screen.dart';
-import 'package:cell_forensic/features/journey/screens/stations/station_screen.dart';
 import 'package:cell_forensic/features/journey/student_journey.dart';
 import 'package:cell_forensic/features/journey/widgets/journey_progress_bar.dart';
 import 'package:cell_forensic/features/session/in_memory_session_repository.dart';
@@ -109,9 +107,9 @@ class _JourneyHostState extends State<JourneyHost> {
           ),
           JourneyStage.onboarding => OnboardingScreen(journey: _journey),
           JourneyStage.investigating => MissionScreen(journey: _journey),
-          JourneyStage.conclusion => ConclusionScreen(journey: _journey),
-          JourneyStage.stations => StationScreen(journey: _journey),
-          JourneyStage.results => ResultsScreen(journey: _journey),
+          JourneyStage.conclusion ||
+          JourneyStage.stations ||
+          JourneyStage.results => ConclusionScreen(journey: _journey),
         };
         return Column(
           children: [
