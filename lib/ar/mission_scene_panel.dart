@@ -836,34 +836,18 @@ class _MissionScenePanelState extends State<MissionScenePanel>
     final visual = widget.sceneEngine.visualState;
     final step = widget.stepCode;
 
-    // Web: load scene GLB per step — each file is the full scene (table + cells)
-    // with the relevant mesh material baked in Blender.
-    // ponytail: scene-misi*.glb files don't exist yet; falls back to scene-1.glb.
-    final glbPath = switch (step) {
-      'glow_organelles' => 'assets/ar_models/scenes/scene-misi1-kloroplas.glb',
-      'play_shrink_animation' => 'assets/ar_models/scenes/scene-misi1-vakuola.glb',
-      'zoom_membrane' => 'assets/ar_models/scenes/scene-misi2-membran.glb',
-      'show_both_samples' || 'mark_sample_b' =>
-        'assets/ar_models/scenes/scene-misi3-dinding.glb',
-      _ => ArAssetRegistry.scene1,
-    };
-    // Fall back to scene-1.glb if the step-specific file doesn't exist yet.
+    // Same mapping as AR: registry drives scene GLB per mission + step.
+    final glbPath = ArAssetRegistry.modelForStep(widget.missionCode, step) ??
+        ArAssetRegistry.primaryModelForMission(widget.missionCode);
     final src = kIsWeb ? glbPath.replaceAll(' ', '%20') : glbPath;
 
-    // Camera orbit zoom per step.
-    final orbit = switch (step) {
-      'zoom_internal' || 'glow_organelles' || 'play_shrink_animation' =>
-        '-20deg 70deg 75%',
-      'zoom_membrane' => '20deg 70deg 75%',
-      'show_both_samples' || 'mark_sample_b' => '0deg 75deg 95%',
-      _ => '0deg 75deg 115%',
-    };
+    final orbit = ArAssetRegistry.cameraOrbitForStep(step);
 
     return Stack(
       fit: StackFit.expand,
       children: [
         ModelViewer(
-          key: ValueKey('mv-lab-$step'),
+          key: ValueKey('mv-lab-$glbPath-$step'),
           src: src,
           alt: 'Meja laboratorium forensik sel',
           ar: false,
