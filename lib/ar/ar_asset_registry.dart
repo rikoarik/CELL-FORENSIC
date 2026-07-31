@@ -3,62 +3,40 @@ import 'package:cell_forensic/ar/organelle_label_map.dart';
 
 /// Maps mission / sequence codes to GLB asset paths under `assets/ar_models/`.
 ///
-/// Paths match the audited files in `docs/10_ASSET_INVENTORY_AUDIT.md` and the
-/// local folder layout. Prefer AllInOne / solo models without spaces in the
-/// filename so AR copy-to-disk and Model Viewer URLs stay reliable.
-///
-/// Full inventory: [ArAssetManifest.allAssets]. Labels: [OrganelleLabelMap].
+/// Web + AR use the same scene files in `assets/ar_models/scenes/`.
+/// Idle/default uses [scene1] (`scene-1.glb`).
 class ArAssetRegistry {
   const ArAssetRegistry._();
 
-  /// Inventory size after E0-01 + rework exports (not the aspirational “30”).
   static int get inventoriedCount => ArAssetManifest.allAssets.length;
 
   static bool get organelleLabelsSafe =>
       OrganelleLabelMap.assertProvisionalRules();
 
-  static const scene1 = 'assets/ar_models/scenes/scene-misi2-membran.glb';
-  static const mejaLab = 'assets/ar_models/Meja/MejaLab_Putih.glb';
-  /// Specimen trays that sit on the lab table under Sample A / Sample B.
-  static const tempatUji = 'assets/ar_models/Meja/TempatUji.glb';
-  /// Intact plant cell for live AR (AllInOne ~8MB — SceneView-safe).
-  ///
-  /// Export_2 (~14MB) is reserved for Mode 3D viewer; SceneView often fails
-  /// to inflate that size on mid-range Android.
-  static const sampleA =
-      'assets/ar_models/SelTumbuhan/SelTumbuhanRework_AllInOne.glb';
-  /// Hi-fi intact plant cell for Model Viewer (Mode 3D).
-  static const sampleAViewer =
-      'assets/ar_models/SelTumbuhan/SelTumbuhanRework_Export_2_normal_color.glb';
-  static const sampleADamaged =
-      'assets/ar_models/SelTumbuhan/SelTumbuhanRework_Export_1_normal_color.glb';
-  static const sampleB =
-      'assets/ar_models/SelHewan/SelHewanBroken_NewExport 2.glb';
+  /// Idle scene (meja + 2 sel).
+  static const scene1 = 'assets/ar_models/scene-1.glb';
 
-  /// Model path for the active render path (live AR vs 3D viewer).
-  static String sampleAFor({required bool liveAr}) =>
-      liveAr ? sampleA : sampleAViewer;
+  /// Lab table / tray — same as idle scene (merged GLB).
+  static const mejaLab = scene1;
+  static const tempatUji = scene1;
 
-  static const nukleusSolo =
-      'assets/ar_models/SelTumbuhan/SelTumbuhhanSolo/Nukleus_Solo.glb';
-  static const kloroplasSolo =
-      'assets/ar_models/SelTumbuhan/SelTumbuhhanSolo/KlooroPlas_Solo.glb';
-  static const dindingSelSolo =
-      'assets/ar_models/SelTumbuhan/SelTumbuhhanSolo/DindingSel_Solo.glb';
-  static const mitokondriaSolo =
-      'assets/ar_models/SelTumbuhan/SelTumbuhhanSolo/Mitokondria_Solo.glb';
-  static const vakuolaMainSolo =
-      'assets/ar_models/SelTumbuhan/SelTumbuhhanSolo/VakolaMain_Solo.glb';
-  static const rantaiProtein =
-      'assets/ar_models/SelHewan/RantaiProtein/RantaiProtein.glb';
+  /// Per-mission / per-step scene swaps (full scene, same as web).
+  static const sceneMisi1Kloroplas =
+      'assets/ar_models/scenes/scene-misi1-kloroplas.glb';
+  static const sceneMisi1Vakuola =
+      'assets/ar_models/scenes/scene-misi1-vakuola.glb';
+  static const sceneMisi2Membran =
+      'assets/ar_models/scenes/scene-misi2-membran.glb';
+  static const sceneMisi3Dinding =
+      'assets/ar_models/scenes/scene-misi3-dinding.glb';
 
-  /// Primary GLB for a mission scene (fallback 3D viewer + AR placement).
+  /// Primary GLB for a mission (before a specific sequence step fires).
   static String primaryModelForMission(String missionCode) {
     return switch (missionCode) {
-      'MISI-1' => sampleA,
-      'MISI-2' => sampleB,
-      'MISI-3' => sampleA,
-      _ => sampleA,
+      'MISI-1' => scene1,
+      'MISI-2' => sceneMisi2Membran,
+      'MISI-3' => sceneMisi3Dinding,
+      _ => scene1,
     };
   }
 
@@ -66,40 +44,33 @@ class ArAssetRegistry {
   static String? modelForStep(String missionCode, String? stepCode) {
     if (stepCode == null) return null;
     return switch ((missionCode, stepCode)) {
-      // Misi 1 — investigasi internal Sampel A (tumbuhan).
-      // zoom_internal stays on the intact plant cell so kloroplas + vakuola
-      // remain in-frame (do NOT swap to nukleusSolo — GAP-6).
-      ('MISI-1', 'focus_sample_a') => sampleA,
-      ('MISI-1', 'zoom_internal') => sampleA,
-      ('MISI-1', 'glow_organelles') => kloroplasSolo,
-      ('MISI-1', 'play_shrink_animation') => vakuolaMainSolo,
-
-      // Misi 2 — membran Sampel B (hewan)
-      ('MISI-2', 'focus_sample_b') => sampleB,
-      ('MISI-2', 'zoom_membrane') => sampleB,
-      ('MISI-2', 'show_torn_bilayer') => rantaiProtein,
-      ('MISI-2', 'play_leak_particles') => rantaiProtein,
-
-      // Misi 3 — damaged A glow then bandingkan (never mitokondriaSolo on arrows).
-      ('MISI-3', 'show_damaged_sample_a') => sampleADamaged,
-      ('MISI-3', 'show_both_samples') => sampleA,
-      ('MISI-3', 'highlight_cell_wall') => dindingSelSolo,
-      ('MISI-3', 'mark_sample_b') => sampleA,
-      // Wave 1 bugfix: stay dinding/sampleA — not mitokondriaSolo.
-      ('MISI-3', 'show_force_arrows') => dindingSelSolo,
-
+      ('MISI-1', 'glow_organelles') => sceneMisi1Kloroplas,
+      ('MISI-1', 'play_shrink_animation') => sceneMisi1Vakuola,
+      ('MISI-1', _) => scene1,
+      ('MISI-2', _) => sceneMisi2Membran,
+      ('MISI-3', _) => sceneMisi3Dinding,
       _ => null,
     };
   }
 
-  /// Model Viewer camera orbit hint per step (drag/pinch still enabled).
-  ///
-  /// Misi 1 orbits pull closer for “through wall” framing (fallback only —
-  /// live AR approximates zoom via [Misi1Visuals] node scale, not dolly).
+  // Aliases — old call sites still reference these names.
+  static const sampleA = scene1;
+  static const sampleAViewer = scene1;
+  static const sampleADamaged = sceneMisi1Kloroplas;
+  static const sampleB = sceneMisi2Membran;
+  static const kloroplasSolo = sceneMisi1Kloroplas;
+  static const vakuolaMainSolo = sceneMisi1Vakuola;
+  static const dindingSelSolo = sceneMisi3Dinding;
+  static const rantaiProtein = sceneMisi2Membran;
+  static const nukleusSolo = scene1;
+  static const mitokondriaSolo = scene1;
+
+  /// Used by [mission_screen] when picking Sample A path for lab init.
+  static String sampleAFor({required bool liveAr}) => scene1;
+
+  /// Model Viewer camera orbit hint per step.
   static String cameraOrbitForStep(String? stepCode) {
     return switch (stepCode) {
-      // M1: through-wall → organelle focus → yellow glow → deflated vacuole
-      // Relative radius keeps very differently-authored GLBs in frame.
       'zoom_internal' => '0deg 58deg 75%',
       'glow_organelles' => '35deg 50deg 90%',
       'play_shrink_animation' => '25deg 65deg 85%',
@@ -113,7 +84,6 @@ class ArAssetRegistry {
     };
   }
 
-  /// Human-readable Indonesian label for the active mode.
   static String modeLabel({required bool useAr}) =>
       useAr ? 'Mode AR (Kamera)' : 'Mode 3D Viewer';
 }
