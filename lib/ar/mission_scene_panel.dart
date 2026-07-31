@@ -112,11 +112,11 @@ double combineLiveNodeScale({
 
 class _MissionScenePanelState extends State<MissionScenePanel>
     with WidgetsBindingObserver {
-  /// Cell `scaleToUnits` so Sampel A/B nearly fill TempatUji (~0.22 m dishes).
-  /// Author sizes: sel tumbuhan ~11 m AABB / sel hewan ~2.2 m → both become ~0.20 m.
+  /// Cell `scaleToUnits` (legacy solo-organelle meshes). Merged scene GLBs use
+  /// [_labTableBaseScale] because they include the full lab desk footprint.
   static const _baseScale = 0.20;
-  /// Desk footprint (SceneView `scaleToUnits`). Meja 2.06×0.90×1.27 → at 1.6 m
-  /// the authored tabletop (Y=0.90) sits ≈ [_labTableTopY] above the plane.
+  /// Desk footprint (SceneView `scaleToUnits`). Merged `scene-*.glb` author size
+  /// ≈ meja 2.06×0.90×1.27 → at 1.6 m the tabletop sits ≈ above the plane.
   static const _labTableBaseScale = 1.60;
   /// TempatUji author 0.13×0.02×0.13 → ~0.22 m diameter on the tabletop.
   static const _tempatUjiBaseScale = 0.22;
@@ -304,14 +304,17 @@ class _MissionScenePanelState extends State<MissionScenePanel>
     await _syncNodesFromVisualState();
   }
 
-  /// Scene 1 after plane tap / fallback ready: Meja Lab + Sample A + Sample B.
+  /// Scene 1 after plane tap / fallback ready: one merged scene GLB.
   /// Does not advance the mission sequence (GAP-1).
   Future<void> _finalizePlacement() async {
+    final scenePath =
+        ArAssetRegistry.modelForStep(widget.missionCode, widget.stepCode) ??
+            ArAssetRegistry.primaryModelForMission(widget.missionCode);
     await widget.sceneEngine.initLabScene(
-      labTableModelPath: ArAssetRegistry.mejaLab,
-      tempatUjiModelPath: ArAssetRegistry.tempatUji,
-      sampleAModelPath: ArAssetRegistry.sampleAFor(liveAr: _wantsLiveAr),
-      sampleBModelPath: ArAssetRegistry.sampleB,
+      labTableModelPath: scenePath,
+      tempatUjiModelPath: null,
+      sampleAModelPath: scenePath,
+      sampleBModelPath: scenePath,
       sampleOffsetX: _sampleOffsetX,
     );
     await _syncNodesFromVisualState();
@@ -839,7 +842,7 @@ class _MissionScenePanelState extends State<MissionScenePanel>
     // Same mapping as AR: registry drives scene GLB per mission + step.
     final glbPath = ArAssetRegistry.modelForStep(widget.missionCode, step) ??
         ArAssetRegistry.primaryModelForMission(widget.missionCode);
-    final src = kIsWeb ? glbPath.replaceAll(' ', '%20') : glbPath;
+    final src = ArAssetRegistry.modelViewerSrc(glbPath, forWeb: kIsWeb);
 
     final orbit = ArAssetRegistry.cameraOrbitForStep(step);
 
@@ -1178,9 +1181,15 @@ class _MissionScenePanelState extends State<MissionScenePanel>
 
   Vector3 _liveScaleFor(String? nodeId) {
     final seq = _sequenceScaleFor(nodeId) ?? ArVec3.one;
+    // Primary/sample nodes now carry the merged scene GLB (full desk), so they
+    // share the lab-table footprint scale — not the old solo-cell 0.20 scale.
     final base = switch (nodeId) {
-      ArNodeIds.labTable => _labTableBaseScale,
       ArNodeIds.tempatUjiA || ArNodeIds.tempatUjiB => _tempatUjiBaseScale,
+      ArNodeIds.labTable ||
+      ArNodeIds.primary ||
+      ArNodeIds.sampleA ||
+      ArNodeIds.sampleB =>
+        _labTableBaseScale,
       _ => _baseScale,
     };
     // Prefer component-wise so non-uniform director scales still apply.

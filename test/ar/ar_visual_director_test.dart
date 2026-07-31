@@ -53,7 +53,7 @@ void main() {
       stepCode: 'show_both_samples',
     );
     expect(engine.visualState.activeModelPath, ArAssetRegistry.sampleA);
-    expect(engine.visualState.secondaryModelPath, ArAssetRegistry.sampleB);
+    expect(engine.visualState.secondaryModelPath, isNull);
     expect(engine.visualState.overlay, ArOverlayEffect.comparisonLabels);
   });
 
@@ -68,7 +68,7 @@ void main() {
       stepCode: 'show_both_samples',
     );
     expect(engine.visualState.activeModelPath, ArAssetRegistry.sampleA);
-    expect(engine.visualState.secondaryModelPath, ArAssetRegistry.sampleB);
+    expect(engine.visualState.secondaryModelPath, isNull);
     expect(engine.visualState.overlay, ArOverlayEffect.comparisonLabels);
     expect(
       engine.visualState.nodeScale[ArNodeIds.primary],
@@ -81,7 +81,7 @@ void main() {
       stepCode: 'highlight_cell_wall',
     );
     expect(engine.visualState.activeModelPath, ArAssetRegistry.dindingSelSolo);
-    expect(engine.visualState.secondaryModelPath, ArAssetRegistry.sampleB);
+    expect(engine.visualState.secondaryModelPath, isNull);
     expect(engine.visualState.highlightTarget, ArNodeIds.cellWall);
     expect(engine.visualState.overlay, ArOverlayEffect.cellWallHighlight);
 
@@ -91,7 +91,7 @@ void main() {
       stepCode: 'mark_sample_b',
     );
     expect(engine.visualState.activeModelPath, ArAssetRegistry.sampleA);
-    expect(engine.visualState.secondaryModelPath, ArAssetRegistry.sampleB);
+    expect(engine.visualState.secondaryModelPath, isNull);
     expect(engine.visualState.overlay, ArOverlayEffect.missingStructureCross);
 
     await director.applySequenceStep(
@@ -108,7 +108,7 @@ void main() {
       engine.visualState.activeModelPath,
       isNot(ArAssetRegistry.mitokondriaSolo),
     );
-    expect(engine.visualState.secondaryModelPath, ArAssetRegistry.sampleB);
+    expect(engine.visualState.secondaryModelPath, isNull);
     expect(engine.visualState.overlay, ArOverlayEffect.forceArrows);
     expect(engine.visualState.highlightTarget, ArNodeIds.cellWall);
     expect(
@@ -132,12 +132,9 @@ void main() {
     );
 
     expect(engine.visualState.activeModelPath, ArAssetRegistry.sampleA);
-    expect(
-      engine.visualState.activeModelPath,
-      isNot(ArAssetRegistry.nukleusSolo),
-    );
+    expect(engine.visualState.activeModelPath, ArAssetRegistry.scene1);
     expect(ArAssetRegistry.modelForStep('MISI-1', 'zoom_internal'),
-        ArAssetRegistry.sampleA);
+        ArAssetRegistry.scene1);
     expect(engine.visualState.highlightTarget, ArNodeIds.chloroplast);
     expect(
       engine.visualState.nodeScale[ArNodeIds.primary],
@@ -151,7 +148,7 @@ void main() {
     expect(engine.visualState.overlay, ArOverlayEffect.none);
     expect(engine.visualState.secondaryModelPath, isNull);
     // Lab table anchor asset persists across the zoom step.
-    expect(engine.visualState.labTableModelPath, ArAssetRegistry.mejaLab);
+    expect(engine.visualState.labTableModelPath, isNull);
   });
 
   test('M1 SEQ-MISI-1 full path keeps placement and ends on vacuole', () async {
@@ -192,7 +189,7 @@ void main() {
     );
 
     expect(engine.placement, placement);
-    expect(engine.visualState.labTableModelPath, ArAssetRegistry.mejaLab);
+    expect(engine.visualState.labTableModelPath, isNull);
     expect(engine.visualState.activeModelPath, ArAssetRegistry.vakuolaMainSolo);
     expect(engine.visualState.overlay, ArOverlayEffect.vacuoleDamage);
     expect(
@@ -277,7 +274,7 @@ void main() {
     expect(engine.visualState.secondaryModelPath, isNull);
     expect(engine.visualState.highlightTarget, ArNodeIds.membrane);
     expect(engine.visualState.overlay, ArOverlayEffect.none);
-    expect(engine.visualState.labTableModelPath, ArAssetRegistry.mejaLab);
+    expect(engine.visualState.labTableModelPath, isNull);
 
     await director.applySequenceStep(
       engine,
@@ -313,6 +310,6 @@ void main() {
     expect(engine.visualState.overlay, ArOverlayEffect.waterLeak);
     // Membrane highlight anchors the dark-blue spray (not fullscreen).
     expect(engine.visualState.highlightTarget, ArNodeIds.membrane);
-    expect(engine.visualState.labTableModelPath, ArAssetRegistry.mejaLab);
+    expect(engine.visualState.labTableModelPath, isNull);
   });
 }

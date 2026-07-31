@@ -109,10 +109,11 @@ void main() {
         sampleBModelPath: ArAssetRegistry.sampleB,
       );
 
-      expect(engine.visualState.labTableModelPath, ArAssetRegistry.mejaLab);
-      expect(engine.visualState.visibleNodes[ArNodeIds.labTable], isTrue);
+      expect(engine.visualState.labTableModelPath, isNull);
+      expect(engine.visualState.visibleNodes[ArNodeIds.labTable], isFalse);
       expect(engine.visualState.visibleNodes[ArNodeIds.sampleA], isTrue);
-      expect(engine.visualState.visibleNodes[ArNodeIds.sampleB], isTrue);
+      expect(engine.visualState.visibleNodes[ArNodeIds.sampleB], isFalse);
+      expect(engine.visualState.activeModelPath, ArAssetRegistry.sampleA);
       expect(engine.placement, isNull);
 
       await engine.dispose();
@@ -144,7 +145,9 @@ void main() {
 
       expect(engine.placement, isNotNull);
       expect(engine.visualState.visibleNodes[ArNodeIds.sampleA], isTrue);
-      expect(engine.visualState.visibleNodes[ArNodeIds.sampleB], isTrue);
+      expect(engine.visualState.visibleNodes[ArNodeIds.sampleB], isFalse);
+      expect(engine.visualState.activeModelPath, isNotNull);
+      expect(engine.visualState.secondaryModelPath, isNull);
 
       journey.markLabPlaced();
 

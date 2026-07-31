@@ -306,9 +306,9 @@ abstract interface class ArSceneEngine {
 
   Future<void> place(ArPlacement placement);
 
-  /// Initializes Scene 1: Meja Laboratorium base with Sample A (plant) and
-  /// Sample B (animal) both visible on the table. Does NOT start any mission
-  /// sequence — the lab table stays anchored across later mission actions.
+  /// Initializes the lab with a **single** merged scene GLB (meja + trays +
+  /// cells baked in). Legacy multi-node params are ignored — placing separate
+  /// meja/sample GLBs stacked duplicate tables when each file is a full scene.
   Future<void> initLabScene({
     required String labTableModelPath,
     required String sampleAModelPath,
@@ -431,50 +431,30 @@ class ControllableArSceneEngine implements ArSceneEngine {
     double sampleOffsetX = 0.12,
   }) async {
     _clearZoomSnapshot();
-    // Meja 2.06×0.90×1.27 @ scaleToUnits 1.6 → tabletop Y ≈ 0.70 m.
-    // TempatUji (0.13×0.02) on that surface; cells centered in each dish.
-    const tableTopY = 0.70;
-    const trayY = tableTopY + 0.01;
-    // Mesh-center lift so cells sit in the shallow TempatUji bowl (~2 cm author).
-    const sampleY = trayY + 0.045;
-    final trayPath = tempatUjiModelPath;
+    // Unified scene GLBs already contain meja + trays + both cells.
+    // Place ONE primary node only — never stack labTable/sampleB separately.
+    final scenePath = sampleAModelPath;
     final models = <String, String>{
-      ArNodeIds.labTable: labTableModelPath,
-      ArNodeIds.primary: sampleAModelPath,
-      ArNodeIds.sampleA: sampleAModelPath,
-      ArNodeIds.sampleB: sampleBModelPath,
-      if (trayPath != null) ...{
-        ArNodeIds.tempatUjiA: trayPath,
-        ArNodeIds.tempatUjiB: trayPath,
-      },
+      ArNodeIds.primary: scenePath,
+      ArNodeIds.sampleA: scenePath,
     };
-    // Slight −Z so the meja mesh (authored center ≈ +Z) sits over the anchor.
-    const tableZ = -0.30;
     final positions = <String, ArVec3>{
-      ArNodeIds.labTable: const ArVec3(0, 0, tableZ),
-      ArNodeIds.primary: ArVec3(-sampleOffsetX, sampleY, tableZ),
-      ArNodeIds.sampleA: ArVec3(-sampleOffsetX, sampleY, tableZ),
-      ArNodeIds.sampleB: ArVec3(sampleOffsetX, sampleY, tableZ),
-      if (trayPath != null) ...{
-        ArNodeIds.tempatUjiA: ArVec3(-sampleOffsetX, trayY, tableZ),
-        ArNodeIds.tempatUjiB: ArVec3(sampleOffsetX, trayY, tableZ),
-      },
+      ArNodeIds.primary: ArVec3.zero,
+      ArNodeIds.sampleA: ArVec3.zero,
     };
     final visible = <String, bool>{
-      ArNodeIds.labTable: true,
+      ArNodeIds.labTable: false,
+      ArNodeIds.tempatUjiA: false,
+      ArNodeIds.tempatUjiB: false,
       ArNodeIds.primary: true,
       ArNodeIds.sampleA: true,
-      ArNodeIds.sampleB: true,
-      if (trayPath != null) ...{
-        ArNodeIds.tempatUjiA: true,
-        ArNodeIds.tempatUjiB: true,
-      },
+      ArNodeIds.sampleB: false,
     };
     _setVisual(
       _visual.copyWith(
-        labTableModelPath: labTableModelPath,
-        activeModelPath: sampleAModelPath,
-        secondaryModelPath: sampleBModelPath,
+        clearLabTable: true,
+        activeModelPath: scenePath,
+        clearSecondaryModel: true,
         secondaryOffsetX: sampleOffsetX,
         overlay: ArOverlayEffect.none,
         nodeScale: const {},

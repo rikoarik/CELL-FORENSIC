@@ -68,6 +68,15 @@ class ArAssetRegistry {
   /// Used by [mission_screen] when picking Sample A path for lab init.
   static String sampleAFor({required bool liveAr}) => scene1;
 
+  /// `model_viewer_plus` `src` for a Flutter asset path.
+  ///
+  /// On web, Flutter serves pubspec assets under `/assets/<assetPath>`, so
+  /// `assets/ar_models/x.glb` must be requested as `assets/assets/ar_models/x.glb`.
+  static String modelViewerSrc(String flutterAssetPath, {required bool forWeb}) {
+    final encoded = flutterAssetPath.replaceAll(' ', '%20');
+    return forWeb ? 'assets/$encoded' : encoded;
+  }
+
   /// Model Viewer camera orbit hint per step.
   static String cameraOrbitForStep(String? stepCode) {
     return switch (stepCode) {

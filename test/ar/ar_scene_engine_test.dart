@@ -113,7 +113,7 @@ void main() {
       );
     });
 
-    test('initLabScene shows meja + Sample A + Sample B without runAction',
+    test('initLabScene places one merged scene GLB (no stacked meja)',
         () async {
       await engine.place(const ArPlacement(x: 0, y: 0, z: 0));
       await engine.initLabScene(
@@ -124,21 +124,15 @@ void main() {
       );
 
       final visual = engine.visualState;
-      expect(visual.labTableModelPath, ArAssetRegistry.mejaLab);
+      expect(visual.labTableModelPath, isNull);
       expect(visual.activeModelPath, ArAssetRegistry.sampleA);
-      expect(visual.secondaryModelPath, ArAssetRegistry.sampleB);
-      expect(visual.visibleNodes[ArNodeIds.labTable], isTrue);
-      expect(visual.visibleNodes[ArNodeIds.tempatUjiA], isTrue);
-      expect(visual.visibleNodes[ArNodeIds.tempatUjiB], isTrue);
-      expect(visual.nodeModels[ArNodeIds.tempatUjiA], ArAssetRegistry.tempatUji);
+      expect(visual.secondaryModelPath, isNull);
+      expect(visual.visibleNodes[ArNodeIds.labTable], isFalse);
+      expect(visual.visibleNodes[ArNodeIds.tempatUjiA], isFalse);
+      expect(visual.visibleNodes[ArNodeIds.tempatUjiB], isFalse);
       expect(visual.visibleNodes[ArNodeIds.sampleA], isTrue);
-      expect(visual.visibleNodes[ArNodeIds.sampleB], isTrue);
-      expect(
-        visual.nodePosition[ArNodeIds.tempatUjiA]!.y,
-        lessThan(visual.nodePosition[ArNodeIds.sampleA]!.y),
-      );
-      // Trays must sit on the meja tabletop (~0.70 m), not under the desk.
-      expect(visual.nodePosition[ArNodeIds.tempatUjiA]!.y, greaterThan(0.5));
+      expect(visual.visibleNodes[ArNodeIds.sampleB], isFalse);
+      expect(visual.nodeModels[ArNodeIds.primary], ArAssetRegistry.sampleA);
       expect(visual.overlay, ArOverlayEffect.none);
       // Placement must not complete a mission action (GAP-1).
       expect(

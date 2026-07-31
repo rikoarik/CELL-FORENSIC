@@ -190,13 +190,14 @@ class _MissionScreenState extends State<MissionScreen> {
   }
 
   Future<void> _initLabScene() async {
+    final scenePath =
+        ArAssetRegistry.modelForStep(_mission.code, _sequence?.currentStep?.code) ??
+            ArAssetRegistry.primaryModelForMission(_mission.code);
     await _engine.initLabScene(
-      labTableModelPath: ArAssetRegistry.mejaLab,
-      tempatUjiModelPath: ArAssetRegistry.tempatUji,
-      sampleAModelPath: ArAssetRegistry.sampleAFor(
-        liveAr: widget.journey.arSupported,
-      ),
-      sampleBModelPath: ArAssetRegistry.sampleB,
+      labTableModelPath: scenePath,
+      tempatUjiModelPath: null,
+      sampleAModelPath: scenePath,
+      sampleBModelPath: scenePath,
     );
     if (mounted) setState(() {});
   }

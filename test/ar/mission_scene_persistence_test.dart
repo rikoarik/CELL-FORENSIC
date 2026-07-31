@@ -47,9 +47,9 @@ void main() {
     expect(engine.capabilities.isFallback, isFalse);
     expect(engine.placement, isNotNull);
     // GAP-1: placement shows lab table + both samples, no M1 step auto-start.
-    expect(engine.visualState.labTableModelPath, ArAssetRegistry.mejaLab);
+    expect(engine.visualState.labTableModelPath, isNull);
     expect(engine.visualState.activeModelPath, ArAssetRegistry.sampleA);
-    expect(engine.visualState.secondaryModelPath, ArAssetRegistry.sampleB);
+    expect(engine.visualState.secondaryModelPath, isNull);
     expect(engine.visualState.overlay, ArOverlayEffect.none);
     expect(
       tester.widget<Text>(find.byKey(const Key('mission-mode-label'))).data,

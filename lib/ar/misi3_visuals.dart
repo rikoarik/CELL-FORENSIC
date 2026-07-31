@@ -20,25 +20,24 @@ abstract final class Misi3Visuals {
   static const greenContourArgb = 0xFF22C55E;
 
   static Future<void> _stayOnTabletop(ArSceneEngine engine) async {
+    await engine.setSecondaryModel(null);
+    await engine.hideNode(ArNodeIds.labTable);
+    await engine.hideNode(ArNodeIds.tempatUjiA);
+    await engine.hideNode(ArNodeIds.tempatUjiB);
+    await engine.hideNode(ArNodeIds.sampleB);
     await engine.showNode(ArNodeIds.primary);
-    await engine.showNode(ArNodeIds.labTable);
-    await engine.showNode(ArNodeIds.tempatUjiA);
-    await engine.showNode(ArNodeIds.tempatUjiB);
   }
 
+  /// Comparison beats use one merged scene GLB (A+B already baked in).
+  /// Never attach a second full-scene GLB as [setSecondaryModel] — that stacks mejas.
   static Future<void> _pairSamples(
     ArSceneEngine engine, {
     required String primaryModel,
   }) async {
     await _stayOnTabletop(engine);
     await engine.replaceModelAtActiveAnchor(primaryModel);
-    await engine.setSecondaryModel(
-      ArAssetRegistry.sampleB,
-      offsetX: sideBySideOffsetX,
-    );
     await engine.setNodeScale(ArNodeIds.primary, comparisonScale);
     await engine.setNodeScale(ArNodeIds.sampleA, comparisonScale);
-    await engine.setNodeScale(ArNodeIds.sampleB, comparisonScale);
     await engine.setOpacity(1);
   }
 

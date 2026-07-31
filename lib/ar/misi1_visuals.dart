@@ -16,11 +16,11 @@ abstract final class Misi1Visuals {
   /// Focus Sampel A on the lab table; clear comparison / secondary.
   static Future<void> focusSampleA(ArSceneEngine engine) async {
     await engine.setSecondaryModel(null);
-    await engine.showNode(ArNodeIds.primary);
-    await engine.showNode(ArNodeIds.labTable);
-    await engine.showNode(ArNodeIds.tempatUjiA);
-    await engine.hideNode(ArNodeIds.sampleB);
+    await engine.hideNode(ArNodeIds.labTable);
+    await engine.hideNode(ArNodeIds.tempatUjiA);
     await engine.hideNode(ArNodeIds.tempatUjiB);
+    await engine.hideNode(ArNodeIds.sampleB);
+    await engine.showNode(ArNodeIds.primary);
     await engine.setNodeScale(ArNodeIds.primary, ArVec3.one);
     await engine.setNodeScale(ArNodeIds.chloroplast, ArVec3.one);
     await engine.setNodeScale(ArNodeIds.vacuole, ArVec3.one);
@@ -28,7 +28,6 @@ abstract final class Misi1Visuals {
     await engine.focusOnTarget(ArNodeIds.sampleA);
     await engine.setOpacity(1);
     await engine.showAnchoredOverlayEffect(ArOverlayEffect.none);
-    // Registry maps this step → sampleA. Lab table path is never cleared here.
   }
 
   /// Smooth zoom-through-wall toward kloroplas + vakuola (same plane anchor).

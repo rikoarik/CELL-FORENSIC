@@ -20,11 +20,14 @@ abstract final class Misi2VisualHelpers {
   static const tornBilayerScale = ArVec3(1.5, 1.5, 1.5);
 
   /// Keeps the scene on the existing tabletop placement (no re-anchor).
+  /// Unified scene GLBs already include meja — do not re-enable separate nodes.
   static Future<void> stayOnTabletop(ArSceneEngine engine) async {
-    await engine.showNode(ArNodeIds.primary);
-    await engine.showNode(ArNodeIds.labTable);
-    await engine.showNode(ArNodeIds.tempatUjiB);
+    await engine.setSecondaryModel(null);
+    await engine.hideNode(ArNodeIds.labTable);
     await engine.hideNode(ArNodeIds.tempatUjiA);
+    await engine.hideNode(ArNodeIds.tempatUjiB);
+    await engine.hideNode(ArNodeIds.sampleB);
+    await engine.showNode(ArNodeIds.primary);
   }
 
   /// Step `focus_sample_b` — Sampel B outer layer, membrane highlighted.

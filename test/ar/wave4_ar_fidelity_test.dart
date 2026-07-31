@@ -140,7 +140,7 @@ void main() {
         stepCode: step.code,
       );
       expect(engine.placement, placement);
-      expect(engine.visualState.labTableModelPath, ArAssetRegistry.mejaLab);
+      expect(engine.visualState.labTableModelPath, isNull);
     }
     for (final step in MissionSequences.misi2.steps) {
       await director.applySequenceStep(
@@ -149,7 +149,7 @@ void main() {
         stepCode: step.code,
       );
       expect(engine.placement, placement);
-      expect(engine.visualState.labTableModelPath, ArAssetRegistry.mejaLab);
+      expect(engine.visualState.labTableModelPath, isNull);
     }
     for (final step in MissionSequences.misi3.steps) {
       await director.applySequenceStep(
@@ -158,7 +158,7 @@ void main() {
         stepCode: step.code,
       );
       expect(engine.placement, placement);
-      expect(engine.visualState.labTableModelPath, ArAssetRegistry.mejaLab);
+      expect(engine.visualState.labTableModelPath, isNull);
     }
 
     await engine.dispose();
@@ -311,7 +311,7 @@ void main() {
       if (step.code == SequenceStepCodes.showDamagedSampleA) {
         expect(engine.visualState.secondaryModelPath, isNull);
       } else {
-        expect(engine.visualState.secondaryModelPath, ArAssetRegistry.sampleB);
+        expect(engine.visualState.secondaryModelPath, isNull);
       }
     }
 
@@ -558,12 +558,12 @@ void main() {
         stepCode: step.code,
       );
       expect(engine.placement, placement);
-      expect(engine.visualState.labTableModelPath, ArAssetRegistry.mejaLab);
+      expect(engine.visualState.labTableModelPath, isNull);
       if (step.code == SequenceStepCodes.showDamagedSampleA) {
         expect(engine.visualState.secondaryModelPath, isNull);
         continue;
       }
-      expect(engine.visualState.secondaryModelPath, ArAssetRegistry.sampleB);
+      expect(engine.visualState.secondaryModelPath, isNull);
       expect(
         engine.visualState.secondaryOffsetX,
         Misi3Visuals.sideBySideOffsetX,
