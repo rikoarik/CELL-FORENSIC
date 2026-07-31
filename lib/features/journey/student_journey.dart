@@ -194,7 +194,8 @@ class StudentJourney extends ChangeNotifier {
       JourneyStage.investigating => JourneyStage.groupSetup,
       JourneyStage.conclusion => JourneyStage.investigating,
       JourneyStage.stations => JourneyStage.conclusion,
-      JourneyStage.results => JourneyStage.stations,
+      JourneyStage.results =>
+        content.stations.isEmpty ? JourneyStage.conclusion : JourneyStage.stations,
     };
     if (prev == null) return;
     _transition(prev);
@@ -717,7 +718,9 @@ class StudentJourney extends ChangeNotifier {
     _activeStationUnlocked = false;
     _stationExpiresAt = null;
     _submittedStationCodes.clear();
-    _transition(JourneyStage.stations);
+    _transition(
+      JourneyStage.results,
+    );
   }
 
   Conclusion? conclusion;
