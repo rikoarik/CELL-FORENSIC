@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cell_forensic/ar/ar_asset_registry.dart';
+import 'package:cell_forensic/ar/ar_capability_probe.dart';
 import 'package:cell_forensic/ar/ar_scene_engine.dart';
 import 'package:cell_forensic/ar/ar_visual_director.dart';
 import 'package:cell_forensic/ar/mission_scene_panel.dart';
@@ -21,9 +22,17 @@ import 'package:flutter/material.dart';
 /// Layout: full-bleed AR/3D preview; AI chat + logbook open via FAB sheets.
 /// Missions advance from matched intents — not a linear counter.
 class MissionScreen extends StatefulWidget {
-  const MissionScreen({required this.journey, super.key});
+  const MissionScreen({
+    required this.journey,
+    this.capabilityProbe,
+    super.key,
+  });
 
   final StudentJourney journey;
+
+  /// Rechecks restored AR sessions so a stale `arSupported=true` snapshot
+  /// cannot trap an unsupported mobile device in the camera path.
+  final ArCapabilityProbe? capabilityProbe;
 
   /// Per-step dwell for intent autoplay (PDF progressive beats).
   ///
@@ -81,6 +90,19 @@ class _MissionScreenState extends State<MissionScreen> {
     super.initState();
     widget.journey.addListener(_onJourneyChanged);
     _bindMission(recreateEngine: true);
+    unawaited(_verifyLiveArReadiness());
+  }
+
+  Future<void> _verifyLiveArReadiness() async {
+    if (!widget.journey.arSupported) return;
+    final probe = widget.capabilityProbe;
+    if (probe == null) return;
+    final result = await probe.probe(
+      requestCameraPermission: false,
+    );
+    if (!mounted || !widget.journey.arSupported || result.supported) return;
+    debugPrint('CellForensic live AR recheck failed; using 3D: $result');
+    widget.journey.useFallback3d();
   }
 
   int get _missionNumber {
@@ -238,6 +260,17 @@ class _MissionScreenState extends State<MissionScreen> {
 
   void _onJourneyChanged() {
     if (!mounted) return;
+    // Live AR → fallback 3D downgrade after a failed readiness recheck.
+    if (!widget.journey.arSupported && _engineWantsLiveAr) {
+      setState(() {
+        if (_mission.code != _missionCode) {
+          _bindMission(recreateEngine: true);
+        } else {
+          _recreateSceneEngine();
+        }
+      });
+      return;
+    }
     // Mode 3D → live AR upgrade (same group/session): swap Fake → Live engine.
     if (widget.journey.arSupported && !_engineWantsLiveAr) {
       setState(() {

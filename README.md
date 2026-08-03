@@ -11,14 +11,12 @@ dart analyze
 # Siswa — Android (ARCore) / iOS (ARKit) / emulator
 flutter run -t lib/main_mobile.dart
 
-# Siswa — Chrome (Mode 3D; AR kamera di Android/iOS native)
+# Web siswa + guru dalam satu build
 flutter run -d chrome -t lib/main.dart
-
-# Dashboard guru — Chrome (login teacher)
-flutter run -d chrome -t lib/main_dashboard.dart
 ```
 
-`flutter run -d chrome` tanpa `-t` memakai `lib/main.dart` → **siswa**, bukan dashboard guru.
+Route web: `/` untuk siswa, `/guru` untuk dashboard guru, dan `/dashboard`
+sebagai alias. Vercel/Netlify cukup men-deploy satu folder `build/web`.
 
 Demo teacher (pilot only): email `guru@cellforensic.demo` — password & langkah login di [`docs/E9_TEACHER_AUTH.md`](docs/E9_TEACHER_AUTH.md) → **Demo credentials**.
 
@@ -58,4 +56,4 @@ Deploy: `supabase functions deploy ai-assistant`
 
 - `APP_FLAVOR=dev|staging|prod` (default `dev`)
 - CI: `.github/workflows/ci.yml` — analyze, test, web staging; release artifacts via `workflow_dispatch`
-- Scripts: `scripts/release_android.sh`, `scripts/release_web_dashboard.sh`
+- Scripts: `scripts/release_android.sh`, `scripts/release_web_dashboard.sh` (satu build web)

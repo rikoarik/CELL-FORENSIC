@@ -1,3 +1,4 @@
+import 'package:cell_forensic/ar/ar_capability_probe.dart';
 import 'package:cell_forensic/ar/mission_scene_panel.dart';
 import 'package:cell_forensic/domain/intent_matcher.dart';
 import 'package:cell_forensic/domain/mission_progress.dart';
@@ -284,6 +285,39 @@ void main() {
     expect(
       tester.widget<TextField>(find.byKey(_assistantInputKey)).controller?.text,
       'draft sebelum upgrade',
+    );
+  });
+
+  testWidgets('unsupported restored AR session switches to 3D viewer', (
+    tester,
+  ) async {
+    final journey = _investigatingJourney(arSupported: true)
+      ..startMissionFromIntent(1)
+      ..saveSequenceProgress(stepIndex: 1, completed: false);
+    final probe = ArCapabilityProbe(
+      debugOverride: () async => const ArCapabilityResult(
+        supported: false,
+        reason: 'arcore_unsupported_device',
+        platform: 'android',
+        arcoreAvailability: 'UNSUPPORTED_DEVICE_NOT_CAPABLE',
+        cameraGranted: true,
+        probed: true,
+      ),
+    );
+
+    await tester.pumpWidget(
+      _wrap(MissionScreen(journey: journey, capabilityProbe: probe)),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(journey.arSupported, isFalse);
+    expect(journey.stage, JourneyStage.investigating);
+    expect(journey.sequenceStepIndex, 1);
+    expect(journey.missionStatus(1), MissionStatus.running);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('mission-mode-label'))).data,
+      'Mode 3D Viewer',
     );
   });
 

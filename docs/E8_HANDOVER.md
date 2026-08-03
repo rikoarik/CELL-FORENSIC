@@ -9,7 +9,7 @@ Penerima: tim pengajar / fasilitator pilot / maintainer teknis
 | Artifact | Lokasi |
 |---|---|
 | Aplikasi siswa (Flutter Android) | `lib/main_mobile.dart` → APK via `scripts/release_android.sh` |
-| Dashboard guru (Flutter Web) | `lib/main_dashboard.dart` → `scripts/release_web_dashboard.sh` |
+| Web siswa + dashboard guru | `lib/main.dart` → `scripts/release_web_dashboard.sh` (satu build) |
 | Skema & migrasi Supabase | `docs/supabase_schema.sql`, `supabase/migrations/` (termasuk E9) |
 | Task registry | `docs/TASK-REGISTRY.yaml` (E0–E9) |
 | Acceptance / regresi | `docs/E8_ACCEPTANCE.md` |
@@ -65,16 +65,19 @@ flutter run -t lib/main_mobile.dart \
 
 Tanpa define Supabase yang valid, app tetap jalan offline dengan content pack lokal (join demo `CELL01`).
 
-### Dashboard guru (web)
+### Web siswa + dashboard guru
 
 ```bash
-flutter run -d chrome -t lib/main_dashboard.dart \
+flutter run -d chrome -t lib/main.dart \
   --dart-define=APP_FLAVOR=dev \
   --dart-define=SUPABASE_URL="$SUPABASE_URL" \
   --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
 ```
 
-Login email/password guru diperlukan (`TeacherAuthGate`). Demo pilot: `guru@cellforensic.demo` — lihat `docs/E9_TEACHER_AUTH.md` → **Demo credentials**. Buat guru baru: `promote_user_to_teacher` (prosedur di E9).
+Buka `/` untuk siswa dan `/guru` untuk login dashboard guru (`/dashboard`
+adalah alias). Login email/password guru diperlukan (`TeacherAuthGate`). Demo
+pilot: `guru@cellforensic.demo` — lihat `docs/E9_TEACHER_AUTH.md` → **Demo
+credentials**. Buat guru baru: `promote_user_to_teacher` (prosedur di E9).
 
 ## 5. Flavors
 
@@ -101,7 +104,7 @@ Implementasi: `lib/core/config/app_flavor.dart` (diuji di `test/core/config/app_
 | Langkah | Perintah / aksi |
 |---|---|
 | APK release | `./scripts/release_android.sh` → `build/app/outputs/flutter-apk/app-release.apk` |
-| Web release | `./scripts/release_web_dashboard.sh` → `build/web/` |
+| Web release | `./scripts/release_web_dashboard.sh` → satu `build/web/` untuk siswa + guru |
 | CI otomatis | Push/PR → `dart analyze` + `flutter test` + web staging build |
 | CI artifak release | `workflow_dispatch` + `build_release=true` (butuh secrets anon) |
 
@@ -110,7 +113,7 @@ Detail: `docs/E7_RELEASE.md`.
 Smoke pasca-release (manual):
 
 1. Install APK → join `CELL01` → buka misi 1 (AR atau fallback 3D).
-2. Buka dashboard hosted → **login guru** → sesi aktif + kelompok terlihat.
+2. Buka hosted `/guru` → **login guru** → sesi aktif + kelompok terlihat.
 3. Network tab browser: hanya anon key (+ JWT session setelah login).
 
 ## 8. Alur produk (untuk fasilitator)

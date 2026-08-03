@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# E7-05 — Release Flutter Web teacher dashboard.
+# E7-05 — Release unified Flutter Web app (student + teacher routes).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -15,9 +15,9 @@ flutter pub get
 echo "==> dart analyze"
 dart analyze
 
-echo "==> flutter build web (lib/main_dashboard.dart, flavor=$FLAVOR)"
+echo "==> flutter build web (lib/main.dart, flavor=$FLAVOR)"
 flutter build web \
-  -t lib/main_dashboard.dart \
+  -t lib/main.dart \
   --release \
   --dart-define="APP_FLAVOR=$FLAVOR" \
   --dart-define="SUPABASE_URL=$SUPABASE_URL" \

@@ -87,6 +87,46 @@ void main() {
     expect(journey.arSupported, isFalse);
   });
 
+  testWidgets('ARCore runtime unavailable routes mobile to Mode 3D', (
+    tester,
+  ) async {
+    for (final result in [
+      const ArCapabilityResult(
+        supported: false,
+        reason: 'arcore_not_installed',
+        platform: 'android',
+        arcoreAvailability: 'SUPPORTED_NOT_INSTALLED',
+        cameraGranted: true,
+        hasCameraArFeature: true,
+      ),
+      const ArCapabilityResult(
+        supported: false,
+        reason: 'arcore_apk_too_old',
+        platform: 'android',
+        arcoreAvailability: 'SUPPORTED_APK_TOO_OLD',
+        cameraGranted: true,
+        hasCameraArFeature: true,
+      ),
+    ]) {
+      final journey = _journey();
+      await tester.pumpWidget(
+        _wrap(DeviceCheckScreen(journey: journey, probe: _probe(result))),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byKey(const Key('device-check-continue-3d')), findsOneWidget);
+      expect(find.byKey(const Key('device-check-continue-ar')), findsNothing);
+      expect(find.textContaining('menggunakan Mode 3D'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('device-check-continue-3d')));
+      await tester.pump();
+      expect(journey.arSupported, isFalse);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    }
+  });
+
   testWidgets('retry re-runs probe after camera denial', (tester) async {
     var calls = 0;
     final journey = _journey();

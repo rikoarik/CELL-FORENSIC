@@ -5,7 +5,7 @@
     "display": "standalone",
     "background_color": "#102A43",
     "theme_color": "#102A43",
-    "description": "Cell Forensic — praktikum siswa (web Mode 3D) dan dashboard guru. Jalankan dengan target Flutter yang sesuai.",
+    "description": "Cell Forensic — praktikum siswa dan dashboard guru dalam satu aplikasi web.",
     "orientation": "any",
     "prefer_related_applications": false,
     "icons": [

@@ -5,7 +5,7 @@
 | Target | Command |
 |---|---|
 | Mobile (default) | `flutter run` / `flutter run -t lib/main_mobile.dart` |
-| Teacher dashboard (web) | `flutter run -d chrome -t lib/main_dashboard.dart` |
+| Web siswa + guru | `flutter run -d chrome -t lib/main.dart` (`/` siswa, `/guru` guru) |
 
 ## Flavors (E1-06)
 
@@ -15,7 +15,7 @@ flutter run --dart-define=APP_FLAVOR=staging
 flutter run --dart-define=APP_FLAVOR=prod
 ```
 
-CI builds web dashboard with `APP_FLAVOR=staging`.
+Route `/dashboard` remains an alias for `/guru`.
 
 ## Services bootstrap
 

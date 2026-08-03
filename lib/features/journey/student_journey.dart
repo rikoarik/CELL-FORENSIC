@@ -212,6 +212,14 @@ class StudentJourney extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Downgrades an AR-marked session to the 3D viewer without resetting the
+  /// joined group, mission progress, sequence, logbook, or conclusion draft.
+  void useFallback3d() {
+    if (!_arSupported) return;
+    _arSupported = false;
+    notifyListeners();
+  }
+
   /// Records a successful join by code (local and/or remote). Advances to
   /// [JourneyStage.groupSetup].
   void acceptJoinedSession({

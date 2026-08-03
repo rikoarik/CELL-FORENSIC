@@ -71,28 +71,29 @@ class MainActivity : FlutterActivity() {
                 null
             }
 
-        // checkAvailability may return TRANSIENT_ERROR while Play Services
-        // resolves; treat known-supported / installed states as live-AR ready.
-        val arcoreSupported =
-            when (availability) {
-                ArCoreApk.Availability.SUPPORTED_INSTALLED,
-                ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD,
-                ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED,
-                -> true
-                ArCoreApk.Availability.UNKNOWN_CHECKING,
-                ArCoreApk.Availability.UNKNOWN_TIMED_OUT,
-                ArCoreApk.Availability.UNKNOWN_ERROR,
-                -> hasFeature // soft: feature flag as tie-breaker
-                else -> false
-            }
+        // Live AR is usable only when the runtime is already installed and
+        // current. Hardware capability alone is not readiness: routing
+        // NOT_INSTALLED / APK_TOO_OLD / UNKNOWN into AR leaves the mission
+        // stuck on "tracking lost" instead of opening the 3D viewer.
+        val arcoreReady = availability == ArCoreApk.Availability.SUPPORTED_INSTALLED
 
         val availabilityName = availability?.name ?: "CHECK_FAILED"
-        val supported = arcoreSupported && cameraGranted
+        val supported = arcoreReady && cameraGranted
         val reason =
             when {
                 !cameraGranted -> "camera_permission_denied"
                 availability == ArCoreApk.Availability.UNSUPPORTED_DEVICE_NOT_CAPABLE ->
                     "arcore_unsupported_device"
+                availability == ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED ->
+                    "arcore_not_installed"
+                availability == ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD ->
+                    "arcore_apk_too_old"
+                availability == ArCoreApk.Availability.UNKNOWN_CHECKING ->
+                    "arcore_checking"
+                availability == ArCoreApk.Availability.UNKNOWN_TIMED_OUT ->
+                    "arcore_check_timed_out"
+                availability == ArCoreApk.Availability.UNKNOWN_ERROR ->
+                    "arcore_check_error"
                 availability == null -> "arcore_check_failed"
                 supported -> "arcore_supported"
                 else -> "arcore_$availabilityName".lowercase()

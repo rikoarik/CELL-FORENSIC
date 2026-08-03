@@ -66,6 +66,22 @@ void main() {
     expect(journey.stage, JourneyStage.investigating);
   });
 
+  test('useFallback3d preserves investigating progress and group', () {
+    final journey = StudentJourney(content: _pack())
+      ..completeDeviceCheck(arSupported: true)
+      ..joinWithGroup(groupName: 'Alpha', leaderName: 'Budi')
+      ..startMissionFromIntent(1)
+      ..saveSequenceProgress(stepIndex: 1, completed: false);
+
+    journey.useFallback3d();
+
+    expect(journey.arSupported, isFalse);
+    expect(journey.stage, JourneyStage.investigating);
+    expect(journey.groupName, 'Alpha');
+    expect(journey.sequenceStepIndex, 1);
+    expect(journey.missionStatus(1), MissionStatus.running);
+  });
+
   test('progresses device check -> join -> group -> Scene 1 AR (no Misi 1)', () {
     final journey = StudentJourney(content: _pack());
     journey.completeDeviceCheck(arSupported: false);

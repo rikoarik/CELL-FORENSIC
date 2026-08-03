@@ -18,7 +18,7 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="Cell Forensic — praktikum forensik sel untuk siswa (Mode 3D di browser) dan dashboard guru. Pilih target Flutter: main.dart (siswa) atau main_dashboard.dart (guru).">
+  <meta name="description" content="Cell Forensic — praktikum forensik sel untuk siswa dan dashboard guru dalam satu aplikasi web.">
   <meta name="theme-color" content="#102A43">
 
   <!-- iOS meta tags & icons -->
@@ -35,10 +35,7 @@
   <script type="module" src="./assets/packages/model_viewer_plus/assets/model-viewer.min.js" defer></script>
 </head>
 <body>
-  <!--
-    Shared web shell for student (`lib/main.dart`) and teacher dashboard
-    (`lib/main_dashboard.dart`). MaterialApp title reflects the active target.
-  -->
+  <!-- One web build: `/` for students and `/guru` for teachers. -->
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

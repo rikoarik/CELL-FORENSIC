@@ -1,3 +1,4 @@
+import 'package:cell_forensic/ar/ar_capability_probe.dart';
 import 'package:cell_forensic/core/app_services.dart';
 import 'package:cell_forensic/core/database/local_store.dart';
 import 'package:cell_forensic/domain/entities.dart';
@@ -106,7 +107,10 @@ class _JourneyHostState extends State<JourneyHost> {
             snapshotStore: _snapshotStore,
           ),
           JourneyStage.onboarding => OnboardingScreen(journey: _journey),
-          JourneyStage.investigating => MissionScreen(journey: _journey),
+          JourneyStage.investigating => MissionScreen(
+            journey: _journey,
+            capabilityProbe: ArCapabilityProbe(),
+          ),
           JourneyStage.conclusion ||
           JourneyStage.stations ||
           JourneyStage.results => ConclusionScreen(journey: _journey),

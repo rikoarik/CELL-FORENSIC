@@ -191,6 +191,12 @@ class _DeviceCheckScreenState extends State<DeviceCheckScreen> {
         'Status: izin kamera ditolak — aktifkan kamera di pengaturan, lalu periksa ulang.',
       'arcore_unsupported_device' =>
         'Status: perangkat tidak mendukung ARCore.',
+      'arcore_not_installed' =>
+        'Status: ARCore belum terpasang — menggunakan Mode 3D.',
+      'arcore_apk_too_old' =>
+        'Status: ARCore perlu diperbarui — menggunakan Mode 3D.',
+      'arcore_checking' || 'arcore_check_timed_out' || 'arcore_check_error' =>
+        'Status: kesiapan ARCore belum dapat dipastikan — menggunakan Mode 3D.',
       'arkit_unsupported_device' =>
         'Status: perangkat tidak mendukung ARKit.',
       'platform_unsupported' || 'desktop_or_web' =>
