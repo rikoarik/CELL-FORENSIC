@@ -1,13 +1,20 @@
 [build]
-  publish = "build/web"
+  publish = "dist"
   command = """
     if [ ! -d $HOME/flutter ]; then
       git clone https://github.com/flutter/flutter.git -b stable --depth 1 $HOME/flutter
     fi
     export PATH="$PATH:$HOME/flutter/bin"
     flutter config --enable-web
-    flutter build web --release
+    ./build-all.sh
   """
+
+# Order matters: the more specific /guru/ rule must precede the catch-all,
+# otherwise the teacher dashboard falls through to the student app.
+[[redirects]]
+  from = "/guru/*"
+  to = "/guru/index.html"
+  status = 200
 
 [[redirects]]
   from = "/*"
