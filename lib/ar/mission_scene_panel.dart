@@ -19,6 +19,7 @@ import 'package:cell_forensic/ar/ar_scene_engine.dart';
 import 'package:cell_forensic/ar/ar_scene_overlays.dart';
 import 'package:cell_forensic/ar/ar_visual_director.dart';
 import 'package:cell_forensic/ar/glb_asset_loader.dart';
+import 'package:cell_forensic/ar/model_placement_config.dart';
 import 'package:cell_forensic/ar/organelle_hotspot.dart';
 import 'package:cell_forensic/ar/organelle_hotspot_layer.dart';
 import 'package:flutter/foundation.dart';
@@ -55,6 +56,7 @@ class MissionScenePanel extends StatefulWidget {
     this.onRequestLiveAr,
     this.onHotspotAskAi,
     this.onHotspotLogbook,
+    this.onHotspotPopupChanged,
     this.initiallyInspectedHotspots,
     this.onInspectedHotspotsChanged,
     super.key,
@@ -79,6 +81,10 @@ class MissionScenePanel extends StatefulWidget {
 
   /// Focus related logbook field from an organelle popup.
   final ValueChanged<OrganelleHotspotContent>? onHotspotLogbook;
+
+  /// Lets the parent move or hide floating controls while an observation card
+  /// is open, so those controls never cover the card content.
+  final ValueChanged<bool>? onHotspotPopupChanged;
 
   /// Inspected ids restored from session snapshot (optional).
   final Set<OrganelleHotspotId>? initiallyInspectedHotspots;
@@ -110,18 +116,28 @@ double combineLiveNodeScale({
   return baseScale * gestureScale * seqFactor;
 }
 
+class _NormalizedNodeTransform {
+  const _NormalizedNodeTransform({
+    required this.matrix,
+    required this.bounds,
+    required this.uniformScale,
+    required this.baseCorrectionY,
+    required this.rotationY,
+  });
+
+  final Matrix4 matrix;
+  final ModelBounds bounds;
+  final double uniformScale;
+  final double baseCorrectionY;
+  final double rotationY;
+}
+
 class _MissionScenePanelState extends State<MissionScenePanel>
     with WidgetsBindingObserver {
-  /// Cell `scaleToUnits` (legacy solo-organelle meshes). Merged scene GLBs use
-  /// [_labTableBaseScale] because they include the full lab desk footprint.
-  static const _baseScale = 0.20;
-  /// Desk footprint (SceneView `scaleToUnits`). Merged `scene-*.glb` author size
-  /// ≈ meja 2.06×0.90×1.27 → at 1.6 m the tabletop sits ≈ above the plane.
-  static const _labTableBaseScale = 1.60;
-  /// TempatUji author 0.13×0.02×0.13 → ~0.22 m diameter on the tabletop.
-  static const _tempatUjiBaseScale = 0.22;
-  /// Half-gap between Sampel A / B tray centers on the 1.6 m desk.
-  static const _sampleOffsetX = 0.12;
+  static const _placementConfig = ArModelPlacementConfigs.labScene;
+
+  /// Half-gap between Sampel A / B tray centers in the normalized scene.
+  static const _sampleOffsetX = 0.06;
   static const _director = ArVisualDirector();
 
   /// Keeps the AR platform view identity stable across parent rebuilds.
@@ -143,6 +159,10 @@ class _MissionScenePanelState extends State<MissionScenePanel>
   String? _arError;
   ArScanPhase _scanPhase = ArScanPhase.scanning;
   bool _fallbackReady = false;
+  bool _trackingReady = defaultTargetPlatform != TargetPlatform.android;
+  bool _placementInProgress = false;
+  bool _nodeSyncRequested = false;
+  Future<void>? _nodeSyncFuture;
 
   /// Soft fallback only after fatal live-AR init failure (E11-A).
   bool _liveInitFailed = false;
@@ -154,6 +174,7 @@ class _MissionScenePanelState extends State<MissionScenePanel>
   double _gestureRotationY = 0;
   late final OrganelleHotspotController _hotspots;
   Timer? _introDismissTimer;
+  bool _reportedHotspotPopupOpen = false;
 
   String get _activeAsset {
     final override = widget.sceneEngine.visualState.activeModelPath;
@@ -207,6 +228,11 @@ class _MissionScenePanelState extends State<MissionScenePanel>
 
   void _onHotspotControllerChanged() {
     widget.onInspectedHotspotsChanged?.call(_hotspots.inspectedIds);
+    final popupOpen = _hotspots.openPopupId != null;
+    if (popupOpen != _reportedHotspotPopupOpen) {
+      _reportedHotspotPopupOpen = popupOpen;
+      widget.onHotspotPopupChanged?.call(popupOpen);
+    }
     final selected = _hotspots.selectedId;
     if (selected != null) {
       final content = SampleAOrganelleHotspots.contentFor(selected);
@@ -306,10 +332,10 @@ class _MissionScenePanelState extends State<MissionScenePanel>
 
   /// Scene 1 after plane tap / fallback ready: one merged scene GLB.
   /// Does not advance the mission sequence (GAP-1).
-  Future<void> _finalizePlacement() async {
+  Future<void> _finalizePlacement({bool enableHotspots = true}) async {
     final scenePath =
         ArAssetRegistry.modelForStep(widget.missionCode, widget.stepCode) ??
-            ArAssetRegistry.primaryModelForMission(widget.missionCode);
+        ArAssetRegistry.primaryModelForMission(widget.missionCode);
     await widget.sceneEngine.initLabScene(
       labTableModelPath: scenePath,
       tempatUjiModelPath: null,
@@ -323,8 +349,9 @@ class _MissionScenePanelState extends State<MissionScenePanel>
     if (widget.stepCode != null) {
       await _applyStepVisuals();
     }
-    // Hotspots only after group + placement (never before).
-    if (mounted) _enableHotspots();
+    // Live AR enables hotspots only after its native node was confirmed. The
+    // fallback/debug paths have no native node and may enable them here.
+    if (mounted && enableHotspots) _enableHotspots();
   }
 
   @override
@@ -364,9 +391,8 @@ class _MissionScenePanelState extends State<MissionScenePanel>
         children: [
           MissionScenePanel.debugUsePlaceholderScene
               ? _buildPlaceholder(theme)
-              : (_wantsLiveAr
-                    ? _buildArView(visual)
-                    : _buildModelViewer()),
+              : (_wantsLiveAr ? _buildArView(visual) : _buildModelViewer()),
+          _buildPlaneReadyCallout(theme),
           _buildTopHud(theme),
           Positioned(
             left: 0,
@@ -419,8 +445,8 @@ class _MissionScenePanelState extends State<MissionScenePanel>
   }
 
   Widget _buildTopHud(ThemeData theme) {
-    final statusLine = widget.stepLabel.trim().isNotEmpty &&
-            widget.stepLabel != '—'
+    final statusLine =
+        widget.stepLabel.trim().isNotEmpty && widget.stepLabel != '—'
         ? '${widget.statusLabel} · ${widget.stepLabel}'
         : widget.statusLabel;
     return SafeArea(
@@ -485,17 +511,9 @@ class _MissionScenePanelState extends State<MissionScenePanel>
                       ),
                     ),
                   ),
-                  if (_wantsLiveAr && _scanPhase != ArScanPhase.placed) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      _scanHint,
-                      key: const Key('mission-scan-hint'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.white70,
-                      ),
-                    ),
+                  if (_wantsLiveAr) ...[
+                    const SizedBox(height: 6),
+                    _buildScanStatus(theme),
                   ],
                   if (_liveInitFailed) ...[
                     const SizedBox(height: 4),
@@ -594,9 +612,7 @@ class _MissionScenePanelState extends State<MissionScenePanel>
           TextButton(
             key: const Key('mission-gesture-pinch-out'),
             style: buttonStyle,
-            onPressed: widget.sequencePaused
-                ? null
-                : () => _adjustScale(1.15),
+            onPressed: widget.sequencePaused ? null : () => _adjustScale(1.15),
             child: const Text('Perbesar'),
           ),
           TextButton(
@@ -645,10 +661,8 @@ class _MissionScenePanelState extends State<MissionScenePanel>
           ),
           if (_wantsLiveAr && _scanPhase == ArScanPhase.placed)
             Text(
-              'Ketuk bidang lagi untuk reposisi (anchor baru).',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: Colors.white70,
-              ),
+              'Gunakan tombol reset untuk memindahkan penempatan.',
+              style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
             ),
         ],
       ),
@@ -713,11 +727,145 @@ class _MissionScenePanelState extends State<MissionScenePanel>
 
   String get _scanHint {
     return switch (_scanPhase) {
-      ArScanPhase.planeReady => 'Bidang terdeteksi — ketuk untuk menempatkan.',
+      ArScanPhase.scanning =>
+        'Mencari permukaan...\nGerakkan perangkat perlahan',
+      ArScanPhase.planeReady =>
+        'Permukaan ditemukan\nKetuk lantai untuk menempatkan objek',
       ArScanPhase.placed =>
         'Meja Laboratorium + Sampel A & B ditempatkan. Jalankan langkah untuk memulai misi.',
-      _ => '',
     };
+  }
+
+  String get _scanStatusTitle => switch (_scanPhase) {
+    ArScanPhase.scanning => 'Mencari permukaan',
+    ArScanPhase.planeReady => 'Permukaan terdeteksi',
+    ArScanPhase.placed => 'Objek AR siap',
+  };
+
+  Color get _scanStatusColor => switch (_scanPhase) {
+    ArScanPhase.scanning => const Color(0xFFFBBF24),
+    ArScanPhase.planeReady => const Color(0xFF4ADE80),
+    ArScanPhase.placed => const Color(0xFF60A5FA),
+  };
+
+  IconData get _scanStatusIcon => switch (_scanPhase) {
+    ArScanPhase.scanning => Icons.radar_rounded,
+    ArScanPhase.planeReady => Icons.check_circle_rounded,
+    ArScanPhase.placed => Icons.view_in_ar_rounded,
+  };
+
+  Widget _buildScanStatus(ThemeData theme) {
+    final color = _scanStatusColor;
+    return Semantics(
+      liveRegion: true,
+      label: 'Status deteksi AR: $_scanStatusTitle. $_scanHint',
+      child: Container(
+        key: const Key('mission-scan-status'),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.14),
+          border: Border.all(color: color.withValues(alpha: 0.72)),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              _scanStatusIcon,
+              key: const Key('mission-scan-status-icon'),
+              color: color,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _scanStatusTitle,
+                    key: const Key('mission-scan-status-title'),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    _scanHint.replaceFirst('\n', ' · '),
+                    key: const Key('mission-scan-hint'),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.82),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlaneReadyCallout(ThemeData theme) {
+    if (!_wantsLiveAr || _scanPhase != ArScanPhase.planeReady) {
+      return const SizedBox.shrink();
+    }
+    const color = Color(0xFF4ADE80);
+    return IgnorePointer(
+      child: Align(
+        alignment: const Alignment(0, -0.1),
+        child: Semantics(
+          liveRegion: true,
+          label:
+              'Permukaan terdeteksi. Ketuk permukaan untuk menempatkan objek.',
+          child: Material(
+            key: const Key('mission-plane-detected-indicator'),
+            color: Colors.black.withValues(alpha: 0.78),
+            elevation: 3,
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                border: Border.all(color: color, width: 1.5),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: color,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Permukaan terdeteksi',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        'Ketuk untuk menempatkan objek',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildPlaceholder(ThemeData theme) {
@@ -739,9 +887,7 @@ class _MissionScenePanelState extends State<MissionScenePanel>
             opacity: visual.opacity,
             dualSamples: visual.secondaryModelPath != null,
           ),
-          _buildHotspotLayer(
-            dualSamples: visual.secondaryModelPath != null,
-          ),
+          _buildHotspotLayer(dualSamples: visual.secondaryModelPath != null),
           if (widget.sequencePaused)
             ColoredBox(
               color: Colors.black54,
@@ -762,7 +908,7 @@ class _MissionScenePanelState extends State<MissionScenePanel>
                 padding: const EdgeInsets.all(12),
                 child: Text(
                   _scanHint,
-                    style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: Colors.white),
                 ),
               ),
             ),
@@ -773,55 +919,55 @@ class _MissionScenePanelState extends State<MissionScenePanel>
 
   Widget _buildDebugArControls() {
     return Wrap(
-        spacing: 8,
-        runSpacing: 4,
-        children: [
-          TextButton(
-            key: const Key('mission-debug-plane'),
-            onPressed: () {
-              setState(() => _scanPhase = ArScanPhase.planeReady);
-            },
-            child: const Text('Debug Plane'),
-          ),
-          TextButton(
-            key: const Key('mission-debug-place'),
-            onPressed: () => _debugPlace(),
-            child: const Text('Debug Place'),
-          ),
-          TextButton(
-            key: const Key('mission-debug-tracking-lost'),
-            onPressed: () =>
-                widget.sceneEngine.updateTracking(ArTrackingState.lost),
-            child: const Text('Debug Lost'),
-          ),
-          TextButton(
-            key: const Key('mission-debug-tracking-ok'),
-            onPressed: () {
-              _lifecycle.confirmRelocalized();
-              widget.sceneEngine.updateTracking(ArTrackingState.tracking);
-            },
-            child: const Text('Debug OK'),
-          ),
-          TextButton(
-            key: const Key('mission-debug-force-fallback'),
-            onPressed: () {
-              // Only for tests: simulate unsupported / init failure.
-              setState(() {
-                _liveInitFailed = true;
-                _fallbackReady = true;
-              });
-              widget.onPlacementChanged?.call(true);
-              unawaited(() async {
-                await widget.sceneEngine.place(
-                  const ArPlacement(x: 0, y: 0, z: 0),
-                );
-                await _finalizePlacement();
-              }());
-            },
-            child: const Text('Debug Fallback'),
-          ),
-        ],
-      );
+      spacing: 8,
+      runSpacing: 4,
+      children: [
+        TextButton(
+          key: const Key('mission-debug-plane'),
+          onPressed: () {
+            setState(() => _scanPhase = ArScanPhase.planeReady);
+          },
+          child: const Text('Debug Plane'),
+        ),
+        TextButton(
+          key: const Key('mission-debug-place'),
+          onPressed: () => _debugPlace(),
+          child: const Text('Debug Place'),
+        ),
+        TextButton(
+          key: const Key('mission-debug-tracking-lost'),
+          onPressed: () =>
+              widget.sceneEngine.updateTracking(ArTrackingState.lost),
+          child: const Text('Debug Lost'),
+        ),
+        TextButton(
+          key: const Key('mission-debug-tracking-ok'),
+          onPressed: () {
+            _lifecycle.confirmRelocalized();
+            widget.sceneEngine.updateTracking(ArTrackingState.tracking);
+          },
+          child: const Text('Debug OK'),
+        ),
+        TextButton(
+          key: const Key('mission-debug-force-fallback'),
+          onPressed: () {
+            // Only for tests: simulate unsupported / init failure.
+            setState(() {
+              _liveInitFailed = true;
+              _fallbackReady = true;
+            });
+            widget.onPlacementChanged?.call(true);
+            unawaited(() async {
+              await widget.sceneEngine.place(
+                const ArPlacement(x: 0, y: 0, z: 0),
+              );
+              await _finalizePlacement();
+            }());
+          },
+          child: const Text('Debug Fallback'),
+        ),
+      ],
+    );
   }
 
   Future<void> _debugPlace() async {
@@ -840,17 +986,35 @@ class _MissionScenePanelState extends State<MissionScenePanel>
     final step = widget.stepCode;
 
     // Same mapping as AR: registry drives scene GLB per mission + step.
-    final glbPath = ArAssetRegistry.modelForStep(widget.missionCode, step) ??
+    final glbPath =
+        ArAssetRegistry.modelForStep(widget.missionCode, step) ??
         ArAssetRegistry.primaryModelForMission(widget.missionCode);
     final src = ArAssetRegistry.modelViewerSrc(glbPath, forWeb: kIsWeb);
-
+    final bounds = ArModelPlacementConfigs.auditedBoundsFor(glbPath);
+    final sequenceScale = _sequenceScaleFor(ArNodeIds.primary) ?? ArVec3.one;
+    final sequenceMultiplier =
+        (sequenceScale.x + sequenceScale.y + sequenceScale.z) / 3;
+    final normalizedScale = _placementConfig.uniformScaleFor(
+      bounds,
+      multiplier: _gestureScale * sequenceMultiplier,
+    );
+    final rotationY = _rotationYFor(ArNodeIds.primary);
+    final rotationDegrees = rotationY * 180 / math.pi;
+    final cameraTarget = _placementConfig.modelViewerCameraTarget(
+      bounds,
+      normalizedScale,
+      rotationYRadians: rotationY,
+    );
     final orbit = ArAssetRegistry.cameraOrbitForStep(step);
 
     return Stack(
       fit: StackFit.expand,
       children: [
         ModelViewer(
-          key: ValueKey('mv-lab-$glbPath-$step'),
+          key: ValueKey(
+            'mv-lab-$glbPath-$step-$normalizedScale-$rotationDegrees',
+          ),
+          id: 'cell-forensic-model',
           src: src,
           alt: 'Meja laboratorium forensik sel',
           ar: false,
@@ -858,6 +1022,15 @@ class _MissionScenePanelState extends State<MissionScenePanel>
           cameraControls: true,
           disableZoom: false,
           cameraOrbit: orbit,
+          cameraTarget:
+              '${cameraTarget.x}m ${cameraTarget.y}m ${cameraTarget.z}m',
+          minCameraOrbit: 'auto 25deg 70%',
+          maxCameraOrbit: 'auto 90deg 250%',
+          fieldOfView: '30deg',
+          minFieldOfView: '20deg',
+          maxFieldOfView: '45deg',
+          orientation: '0deg 0deg ${rotationDegrees}deg',
+          scale: '$normalizedScale $normalizedScale $normalizedScale',
           backgroundColor: const Color(0xFF1A1F24),
           loading: Loading.eager,
           relatedCss: 'body{margin:0;background:#1A1F24}',
@@ -909,9 +1082,7 @@ class _MissionScenePanelState extends State<MissionScenePanel>
             opacity: visual.opacity,
             dualSamples: visual.secondaryModelPath != null,
           ),
-          _buildHotspotLayer(
-            dualSamples: visual.secondaryModelPath != null,
-          ),
+          _buildHotspotLayer(dualSamples: visual.secondaryModelPath != null),
         ],
         if (_scanPhase != ArScanPhase.placed)
           Align(
@@ -940,9 +1111,9 @@ class _MissionScenePanelState extends State<MissionScenePanel>
                   'Tracking hilang\nGerakkan perangkat perlahan',
                   key: const Key('mission-tracking-lost'),
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(color: Colors.white),
                 ),
               ),
             ),
@@ -969,17 +1140,39 @@ class _MissionScenePanelState extends State<MissionScenePanel>
     // Assign late handlers before onInitialize — native plane callbacks can
     // fire during init and otherwise throw LateInitializationError.
     session.onPlaneOrPointTap = _onPlaneTapped;
+    session.onTrackingChanged = (state, failureReason) {
+      final tracking = state == 'TRACKING';
+      debugPrint(
+        '[AR_FIX] tracking state $state'
+        '${failureReason == null ? '' : ' reason=$failureReason'}',
+      );
+      _trackingReady = tracking;
+      widget.sceneEngine.updateTracking(
+        tracking ? ArTrackingState.tracking : ArTrackingState.lost,
+      );
+      if (tracking && _scanPhase == ArScanPhase.placed) {
+        _lifecycle.confirmRelocalized();
+      }
+      if (mounted) setState(() {});
+    };
     session.onPlaneDetected = (count) {
       if (!mounted) return;
-      if (count > 0 && _lifecycle.awaitingRelocalization) {
+      if (count <= 0) return;
+
+      // Native only emits planes that are TRACKING and stable. Treat this as
+      // authoritative even if its method-channel event wins the race against
+      // onTrackingChanged; otherwise the one-shot plane event can be lost.
+      _trackingReady = true;
+      widget.sceneEngine.updateTracking(ArTrackingState.tracking);
+      if (_lifecycle.awaitingRelocalization) {
         _lifecycle.confirmRelocalized();
       }
       if (_scanPhase == ArScanPhase.placed) return;
-      if (count > 0) {
-        setState(() => _scanPhase = ArScanPhase.planeReady);
-        // Auto-place on first detected plane — no tap needed.
-        unawaited(_autoPlaceOnFirstPlane());
-      }
+      debugPrint('[AR_FIX] plane detected stableCount=$count');
+      setState(() {
+        _scanPhase = ArScanPhase.planeReady;
+        _arError = null;
+      });
     };
     session.onError = (message) {
       final lower = message.toLowerCase();
@@ -1005,9 +1198,7 @@ class _MissionScenePanelState extends State<MissionScenePanel>
           });
           widget.onPlacementChanged?.call(true);
           unawaited(() async {
-            await widget.sceneEngine.place(
-              const ArPlacement(x: 0, y: 0, z: 0),
-            );
+            await widget.sceneEngine.place(const ArPlacement(x: 0, y: 0, z: 0));
             await _finalizePlacement();
           }());
         }
@@ -1040,71 +1231,115 @@ class _MissionScenePanelState extends State<MissionScenePanel>
     }
   }
 
-  Future<void> _autoPlaceOnFirstPlane() async {
-    if (_scanPhase == ArScanPhase.placed) return;
-    if (_anchors == null || _session == null) return;
-    // Place at world origin of the detected plane.
-    // ponytail: uses (0,0,0); upgrade to center hit-test when plugin exposes screenHitTest.
-    final anchor = ARPlaneAnchor(
-      transformation: Matrix4.identity(),
-    );
-    final added = await _anchors!.addAnchor(anchor);
-    if (added != true || !mounted) return;
-    await widget.sceneEngine.place(const ArPlacement(x: 0, y: 0, z: 0));
-    _lifecycle.confirmRelocalized();
-    widget.sceneEngine.updateTracking(ArTrackingState.tracking);
-    setState(() {
-      _placedAnchor = anchor;
-      _scanPhase = ArScanPhase.placed;
-      _liveInitFailed = false;
-      _arError = null;
-    });
-    widget.onPlacementChanged?.call(true);
-    await _finalizePlacement();
-  }
-
   Future<void> _onPlaneTapped(List<ARHitTestResult> hits) async {
-    if (widget.sequencePaused) return;
+    if (widget.sequencePaused ||
+        _placementInProgress ||
+        _scanPhase == ArScanPhase.placed) {
+      return;
+    }
+    if (!_trackingReady || _scanPhase != ArScanPhase.planeReady) {
+      if (mounted) {
+        setState(() {
+          _arError = 'Tunggu pelacakan stabil dan permukaan ditemukan.';
+        });
+      }
+      return;
+    }
 
     ARHitTestResult? planeHit;
     for (final hit in hits) {
+      debugPrint('[AR_FIX] hit type ${hit.type}');
       if (hit.type == ARHitTestResultType.plane) {
         planeHit = hit;
         break;
       }
     }
-    if (planeHit == null) return;
+    if (planeHit == null) {
+      if (mounted) {
+        setState(
+          () => _arError = 'Ketuk di dalam bidang lantai yang terdeteksi.',
+        );
+      }
+      return;
+    }
 
     final session = _session;
     final objects = _objects;
     final anchors = _anchors;
     if (session == null || objects == null || anchors == null) return;
 
+    _placementInProgress = true;
+    ARPlaneAnchor? createdAnchor;
     try {
-      // Reposition: replace anchor only when user taps again after placed.
-      // Sequence step changes never call this path.
-      if (_placedAnchor != null) {
-        _removeAllSceneNodes(objects);
-        anchors.removeAnchor(_placedAnchor!);
-        _placedAnchor = null;
-        _labTableNode = null;
-        _placedNode = null;
-        _secondaryNode = null;
-        _labTableAssetPath = null;
-        _placedAssetPath = null;
-        _secondaryAssetPath = null;
+      final cameraPose = await session.getCameraPose();
+      if (cameraPose == null) {
+        throw StateError(
+          'Pose kamera belum tersedia. Gerakkan perangkat perlahan.',
+        );
       }
+      final hitTranslation = planeHit.worldTransform.getTranslation();
+      final cameraTranslation = cameraPose.getTranslation();
+      final horizontalDistance = _placementConfig.horizontalDistance(
+        cameraX: cameraTranslation.x,
+        cameraZ: cameraTranslation.z,
+        hitX: hitTranslation.x,
+        hitZ: hitTranslation.z,
+      );
+      debugPrint(
+        '[AR_FIX] hit pose '
+        'x=${hitTranslation.x.toStringAsFixed(4)} '
+        'y=${hitTranslation.y.toStringAsFixed(4)} '
+        'z=${hitTranslation.z.toStringAsFixed(4)}',
+      );
+      debugPrint(
+        '[AR_FIX] camera distance '
+        '${horizontalDistance.toStringAsFixed(3)}m '
+        '(preferred=${_placementConfig.preferredDistanceMeters}m)',
+      );
+
+      switch (_placementConfig.classifyDistance(horizontalDistance)) {
+        case PlacementDistanceStatus.tooNear:
+          if (mounted) {
+            setState(() {
+              _arError =
+                  'Area terlalu dekat. Ketuk lantai minimal '
+                  '${_placementConfig.minimumDistanceMeters.toStringAsFixed(1)} m dari kamera.';
+            });
+          }
+          return;
+        case PlacementDistanceStatus.tooFar:
+          if (mounted) {
+            setState(() {
+              _arError =
+                  'Area terlalu jauh. Pilih lantai dalam jarak '
+                  '${_placementConfig.maximumDistanceMeters.toStringAsFixed(1)} m.';
+            });
+          }
+          return;
+        case PlacementDistanceStatus.valid:
+          break;
+      }
+
+      // Resolve and inspect the model before committing a world anchor.
+      final assetPath = _activeAsset;
+      final bounds = await GlbAssetLoader.loadBounds(assetPath);
+      await GlbAssetLoader.ensureOnDisk(assetPath);
+      debugPrint('[AR_FIX] original bounds $bounds');
 
       final anchor = ARPlaneAnchor(transformation: planeHit.worldTransform);
       final added = await anchors.addAnchor(anchor);
       if (added != true) {
-        setState(() => _arError = 'Gagal menempatkan anchor AR.');
-        return;
+        throw StateError('Gagal menempatkan anchor AR.');
       }
+      createdAnchor = anchor;
+      debugPrint('[AR_FIX] anchor created ${anchor.name}');
 
-      final translation = planeHit.worldTransform.getTranslation();
       await widget.sceneEngine.place(
-        ArPlacement(x: translation.x, y: translation.y, z: translation.z),
+        ArPlacement(
+          x: hitTranslation.x,
+          y: hitTranslation.y,
+          z: hitTranslation.z,
+        ),
       );
 
       // Successful place implies tracking is healthy again.
@@ -1118,14 +1353,45 @@ class _MissionScenePanelState extends State<MissionScenePanel>
         _liveInitFailed = false;
         _arError = null;
       });
-      widget.onPlacementChanged?.call(true);
       // Meja + Sampel A + Sampel B; do not auto-run Mission 1 (GAP-1).
-      await _finalizePlacement();
-      if (_placedNode == null && mounted) {
-        setState(() => _arError = 'Gagal memuat model GLB ke scene AR.');
+      await _finalizePlacement(enableHotspots: false);
+      if (_placedNode == null) {
+        throw StateError('Gagal memuat model GLB ke scene AR.');
       }
+      _enableHotspots();
+      session.showPlanes(false);
+      debugPrint('[AR_FIX] model visible asset=$assetPath');
+      widget.onPlacementChanged?.call(true);
     } catch (error) {
-      setState(() => _arError = 'Error AR: $error');
+      _removeAllSceneNodes(objects);
+      if (createdAnchor != null) {
+        anchors.removeAnchor(createdAnchor);
+      }
+      await widget.sceneEngine.reset();
+      if (mounted) {
+        _hotspots.onResetScan();
+        setState(() {
+          _placedAnchor = null;
+          _labTableNode = null;
+          _tempatUjiANode = null;
+          _tempatUjiBNode = null;
+          _placedNode = null;
+          _secondaryNode = null;
+          _labTableAssetPath = null;
+          _tempatUjiAssetPath = null;
+          _placedAssetPath = null;
+          _secondaryAssetPath = null;
+          _scanPhase = ArScanPhase.planeReady;
+          _arError = 'Error AR: $error';
+        });
+      }
+      widget.onPlacementChanged?.call(false);
+    } finally {
+      if (mounted) {
+        setState(() => _placementInProgress = false);
+      } else {
+        _placementInProgress = false;
+      }
     }
   }
 
@@ -1153,13 +1419,21 @@ class _MissionScenePanelState extends State<MissionScenePanel>
     String? nodeId,
   }) async {
     final fileName = await GlbAssetLoader.ensureOnDisk(assetPath);
-    final scale = _liveScaleFor(nodeId);
+    final normalized = await _normalizedTransformFor(
+      assetPath,
+      nodeId: nodeId,
+      desiredPosition: position ?? Vector3.zero(),
+    );
     return ARNode(
       type: NodeType.fileSystemAppFolderGLB,
       uri: fileName,
-      scale: scale,
-      position: position ?? Vector3.zero(),
-      rotation: Vector4(0, 1, 0, _gestureRotationY),
+      transformation: normalized.matrix,
+      data: {
+        'originalBounds': normalized.bounds.toString(),
+        'normalizedScale': normalized.uniformScale,
+        'baseCorrectionY': normalized.baseCorrectionY,
+        'rotationY': normalized.rotationY,
+      },
     );
   }
 
@@ -1179,28 +1453,87 @@ class _MissionScenePanelState extends State<MissionScenePanel>
     return null;
   }
 
-  Vector3 _liveScaleFor(String? nodeId) {
+  double _sequenceMultiplierFor(String? nodeId) {
     final seq = _sequenceScaleFor(nodeId) ?? ArVec3.one;
-    // Primary/sample nodes now carry the merged scene GLB (full desk), so they
-    // share the lab-table footprint scale — not the old solo-cell 0.20 scale.
-    final base = switch (nodeId) {
-      ArNodeIds.tempatUjiA || ArNodeIds.tempatUjiB => _tempatUjiBaseScale,
-      ArNodeIds.labTable ||
-      ArNodeIds.primary ||
-      ArNodeIds.sampleA ||
-      ArNodeIds.sampleB =>
-        _labTableBaseScale,
-      _ => _baseScale,
-    };
-    // Prefer component-wise so non-uniform director scales still apply.
-    return Vector3(
-      base * _gestureScale * seq.x,
-      base * _gestureScale * seq.y,
-      base * _gestureScale * seq.z,
+    return (seq.x + seq.y + seq.z) / 3;
+  }
+
+  double _rotationYFor(String? nodeId) {
+    final rotations = widget.sceneEngine.visualState.nodeRotationY;
+    var sequenceRotation = nodeId == null ? null : rotations[nodeId];
+    if (sequenceRotation == null && nodeId == ArNodeIds.primary) {
+      sequenceRotation = rotations[ArNodeIds.sampleA];
+    } else if (sequenceRotation == null && nodeId == ArNodeIds.sampleA) {
+      sequenceRotation = rotations[ArNodeIds.primary];
+    }
+    return _placementConfig.rotationCorrectionYRadians +
+        _gestureRotationY +
+        (sequenceRotation ?? 0);
+  }
+
+  Future<_NormalizedNodeTransform> _normalizedTransformFor(
+    String assetPath, {
+    required String? nodeId,
+    required Vector3 desiredPosition,
+  }) async {
+    final bounds = await GlbAssetLoader.loadBounds(assetPath);
+    final uniformScale = _placementConfig.uniformScaleFor(
+      bounds,
+      multiplier: _gestureScale * _sequenceMultiplierFor(nodeId),
+    );
+    final baseCorrectionY = _placementConfig.baseCorrectionY(
+      bounds,
+      uniformScale,
+    );
+    final rotationY = _rotationYFor(nodeId);
+
+    // Scene assets are complete tabletop compositions. Sequence Y values were
+    // authored as legacy visual nudges; using them here makes the table float.
+    // X/Z remain available for intentional side-by-side composition.
+    final groundedPosition = Vector3(
+      desiredPosition.x,
+      baseCorrectionY,
+      desiredPosition.z,
+    );
+    final matrix = Matrix4.compose(
+      groundedPosition,
+      Quaternion.axisAngle(Vector3(0, 1, 0), rotationY),
+      Vector3.all(uniformScale),
+    );
+    debugPrint('[AR_FIX] original bounds asset=$assetPath $bounds');
+    debugPrint('[AR_FIX] normalized scale $uniformScale');
+    debugPrint('[AR_FIX] base correction y=$baseCorrectionY');
+    debugPrint('[AR_FIX] final transform ${matrix.storage.toList()}');
+    return _NormalizedNodeTransform(
+      matrix: matrix,
+      bounds: bounds,
+      uniformScale: uniformScale,
+      baseCorrectionY: baseCorrectionY,
+      rotationY: rotationY,
     );
   }
 
-  Future<void> _syncNodesFromVisualState() async {
+  Future<void> _syncNodesFromVisualState() {
+    _nodeSyncRequested = true;
+    final active = _nodeSyncFuture;
+    if (active != null) return active;
+    final next = _drainNodeSync();
+    _nodeSyncFuture = next;
+    return next;
+  }
+
+  Future<void> _drainNodeSync() async {
+    try {
+      while (_nodeSyncRequested) {
+        _nodeSyncRequested = false;
+        await _syncNodesOnce();
+      }
+    } finally {
+      _nodeSyncFuture = null;
+    }
+  }
+
+  Future<void> _syncNodesOnce() async {
     if (!_wantsLiveAr || _scanPhase != ArScanPhase.placed) return;
     final objects = _objects;
     final anchor = _placedAnchor;
@@ -1315,11 +1648,12 @@ class _MissionScenePanelState extends State<MissionScenePanel>
     }
     final existing = current;
     if (existing != null && _tempatUjiAssetPath == path) {
-      existing.scale = _liveScaleFor(nodeId);
-      existing.eulerAngles = Vector3(0, _gestureRotationY, 0);
-      existing.position = _vecFromAr(
-        visual.nodePosition[nodeId] ?? ArVec3.zero,
+      final normalized = await _normalizedTransformFor(
+        path,
+        nodeId: nodeId,
+        desiredPosition: _vecFromAr(visual.nodePosition[nodeId] ?? ArVec3.zero),
       );
+      existing.transform = normalized.matrix;
       return;
     }
     if (existing != null) {
@@ -1378,42 +1712,48 @@ class _MissionScenePanelState extends State<MissionScenePanel>
   Future<void> _applyUserTransformToNodes() async {
     final visual = widget.sceneEngine.visualState;
     final lab = _labTableNode;
-    if (lab != null) {
-      lab.scale = _liveScaleFor(ArNodeIds.labTable);
-      lab.eulerAngles = Vector3(0, _gestureRotationY, 0);
+    if (lab != null && _labTableAssetPath != null) {
       final labPos = visual.nodePosition[ArNodeIds.labTable] ?? ArVec3.zero;
-      lab.position = _vecFromAr(labPos);
-    }
-    void applyTray(ARNode? node, String nodeId) {
-      if (node == null) return;
-      node.scale = _liveScaleFor(nodeId);
-      node.eulerAngles = Vector3(0, _gestureRotationY, 0);
-      node.position = _vecFromAr(
-        visual.nodePosition[nodeId] ?? ArVec3.zero,
-      );
+      lab.transform = (await _normalizedTransformFor(
+        _labTableAssetPath!,
+        nodeId: ArNodeIds.labTable,
+        desiredPosition: _vecFromAr(labPos),
+      )).matrix;
     }
 
-    applyTray(_tempatUjiANode, ArNodeIds.tempatUjiA);
-    applyTray(_tempatUjiBNode, ArNodeIds.tempatUjiB);
+    Future<void> applyTray(ARNode? node, String nodeId) async {
+      if (node == null || _tempatUjiAssetPath == null) return;
+      node.transform = (await _normalizedTransformFor(
+        _tempatUjiAssetPath!,
+        nodeId: nodeId,
+        desiredPosition: _vecFromAr(visual.nodePosition[nodeId] ?? ArVec3.zero),
+      )).matrix;
+    }
+
+    await applyTray(_tempatUjiANode, ArNodeIds.tempatUjiA);
+    await applyTray(_tempatUjiBNode, ArNodeIds.tempatUjiB);
     final primary = _placedNode;
-    if (primary != null) {
-      primary.scale = _liveScaleFor(ArNodeIds.primary);
-      primary.eulerAngles = Vector3(0, _gestureRotationY, 0);
+    if (primary != null && _placedAssetPath != null) {
       final primaryPos =
           visual.nodePosition[ArNodeIds.primary] ??
-          visual.nodePosition[ArNodeIds.sampleA];
-      if (primaryPos != null) {
-        primary.position = _vecFromAr(primaryPos);
-      }
+          visual.nodePosition[ArNodeIds.sampleA] ??
+          ArVec3.zero;
+      primary.transform = (await _normalizedTransformFor(
+        _placedAssetPath!,
+        nodeId: ArNodeIds.primary,
+        desiredPosition: _vecFromAr(primaryPos),
+      )).matrix;
     }
     final secondary = _secondaryNode;
-    if (secondary != null) {
-      secondary.scale = _liveScaleFor(ArNodeIds.sampleB);
-      secondary.eulerAngles = Vector3(0, _gestureRotationY, 0);
+    if (secondary != null && _secondaryAssetPath != null) {
       final sampleBPos =
           visual.nodePosition[ArNodeIds.sampleB] ??
           ArVec3(visual.secondaryOffsetX, 0.76, -0.30);
-      secondary.position = _vecFromAr(sampleBPos);
+      secondary.transform = (await _normalizedTransformFor(
+        _secondaryAssetPath!,
+        nodeId: ArNodeIds.sampleB,
+        desiredPosition: _vecFromAr(sampleBPos),
+      )).matrix;
     }
   }
 
@@ -1427,6 +1767,8 @@ class _MissionScenePanelState extends State<MissionScenePanel>
     if (anchors != null && anchor != null) {
       anchors.removeAnchor(anchor);
     }
+    await _session?.resetPlaneDetection();
+    _session?.showPlanes(true);
     await widget.sceneEngine.reset();
     widget.sceneEngine.updateTracking(ArTrackingState.tracking);
     if (!mounted) return;

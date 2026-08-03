@@ -59,6 +59,7 @@ class _MissionScreenState extends State<MissionScreen> {
   bool _showLogbook = false;
   bool _engineWantsLiveAr = false;
   bool _workspaceSheetOpen = false;
+  bool _hotspotPopupOpen = false;
   VoidCallback? _refreshWorkspaceSheet;
 
   MissionContent get _mission => widget.journey.activeMission;
@@ -107,6 +108,7 @@ class _MissionScreenState extends State<MissionScreen> {
 
   void _bindMission({required bool recreateEngine}) {
     _missionCode = _mission.code;
+    _hotspotPopupOpen = false;
     _assistant?.removeListener(_onAssistantChanged);
     _assistant?.dispose();
     _assistant = AssistantViewModel(
@@ -607,9 +609,9 @@ class _MissionScreenState extends State<MissionScreen> {
   Widget build(BuildContext context) {
     final mission = _mission;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
-    // Clear of scene bottom bar (Jalankan/Reset ≈ 72) + observation sheet
-    // (~160) + safe area so FABs never cover the hotspot popup.
-    final fabBottom = 88.0 + 160.0 + bottomInset;
+    // Keep the FABs above the scene bottom bar; they are hidden while a
+    // hotspot observation card is open.
+    final fabBottom = 88.0 + bottomInset;
     return Scaffold(
       backgroundColor: const Color(0xFF1A1F24),
       body: Column(
@@ -623,41 +625,43 @@ class _MissionScreenState extends State<MissionScreen> {
           ),
           Expanded(
             child: Stack(
+              key: const Key('mission-scene-stack'),
               children: [
                 Positioned.fill(
-                  bottom: 88.0 + bottomInset,
                   child: _scenePanel(mission: mission),
                 ),
-                // Left side so Reset (right) stays tappable.
-                Positioned(
-                  left: 12,
-                  bottom: fabBottom,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      FloatingActionButton.small(
-                        key: const Key('assistant-fab'),
-                        heroTag: 'mission-assistant-fab',
-                        tooltip: 'Asisten AI',
-                        onPressed: () => unawaited(
-                          _openWorkspaceSheet(logbook: false),
+                // A fixed estimated popup height breaks with text scaling, so
+                // hide the FABs while a hotspot observation card is open.
+                if (!_hotspotPopupOpen)
+                  Positioned(
+                    left: 12,
+                    bottom: fabBottom,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        FloatingActionButton.small(
+                          key: const Key('assistant-fab'),
+                          heroTag: 'mission-assistant-fab',
+                          tooltip: 'Asisten AI',
+                          onPressed: () => unawaited(
+                            _openWorkspaceSheet(logbook: false),
+                          ),
+                          child: const Icon(Icons.smart_toy_outlined),
                         ),
-                        child: const Icon(Icons.smart_toy_outlined),
-                      ),
-                      const SizedBox(height: 8),
-                      FloatingActionButton.small(
-                        key: const Key('mission-logbook-toggle'),
-                        heroTag: 'mission-logbook-fab',
-                        tooltip: 'Logbook',
-                        onPressed: () => unawaited(
-                          _openWorkspaceSheet(logbook: true),
+                        const SizedBox(height: 8),
+                        FloatingActionButton.small(
+                          key: const Key('mission-logbook-toggle'),
+                          heroTag: 'mission-logbook-fab',
+                          tooltip: 'Logbook',
+                          onPressed: () => unawaited(
+                            _openWorkspaceSheet(logbook: true),
+                          ),
+                          child: const Icon(Icons.menu_book_outlined),
                         ),
-                        child: const Icon(Icons.menu_book_outlined),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -746,6 +750,10 @@ class _MissionScreenState extends State<MissionScreen> {
       },
       onHotspotAskAi: _onHotspotAskAi,
       onHotspotLogbook: _onHotspotLogbook,
+      onHotspotPopupChanged: (open) {
+        if (!mounted || _hotspotPopupOpen == open) return;
+        setState(() => _hotspotPopupOpen = open);
+      },
     );
   }
 

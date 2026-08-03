@@ -9,6 +9,13 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+# The vendored AR plugin is analyzed as a dependency when imported by the app.
+# Its upstream examples are incomplete FlutterFlow/Firebase snippets and are
+# not part of this application target.
+analyzer:
+  exclude:
+    - packages/ar_flutter_plugin_2/**
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`

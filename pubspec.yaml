@@ -34,7 +34,11 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  ar_flutter_plugin_2: ^0.0.3
+  # Localized compatibility/placement patch. The public 0.0.3 Android bridge
+  # drops most of the node transform and ships SceneView 2.2.1 / Filament
+  # 1.52.0, whose native ELF segments are only 4 KB aligned.
+  ar_flutter_plugin_2:
+    path: packages/ar_flutter_plugin_2
   model_viewer_plus: ^1.10.0
   path_provider: ^2.1.6
   vector_math: ^2.1.4

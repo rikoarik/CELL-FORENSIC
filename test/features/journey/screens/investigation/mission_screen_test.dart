@@ -86,6 +86,47 @@ void main() {
     expect(find.textContaining('Menyiapkan'), findsWidgets);
   });
 
+  testWidgets('FAB tidak menutupi kartu hasil hotspot', (tester) async {
+    final journey = _investigatingJourney()..startMissionFromIntent(1);
+    await tester.pumpWidget(_wrap(MissionScreen(journey: journey)));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(_assistantFabKey), findsOneWidget);
+    expect(find.byKey(_logbookFabKey), findsOneWidget);
+
+    final vacuole = find.byKey(const Key('mission-tap-vacuole'));
+    await tester.ensureVisible(vacuole);
+    await tester.tap(vacuole);
+    await tester.pump();
+
+    expect(
+      find.byKey(const Key('organelle-popup-vacuole')),
+      findsOneWidget,
+    );
+    expect(find.byKey(_assistantFabKey), findsNothing);
+    expect(find.byKey(_logbookFabKey), findsNothing);
+
+    await tester.tap(find.byKey(const Key('organelle-popup-close')));
+    await tester.pump();
+
+    expect(find.byKey(_assistantFabKey), findsOneWidget);
+    expect(find.byKey(_logbookFabKey), findsOneWidget);
+  });
+
+  testWidgets('panel scene memenuhi area bawah tanpa gap kosong', (tester) async {
+    final journey = _investigatingJourney()..startMissionFromIntent(1);
+    await tester.pumpWidget(_wrap(MissionScreen(journey: journey)));
+    await tester.pump();
+
+    final stackRect = tester.getRect(
+      find.byKey(const Key('mission-scene-stack')),
+    );
+    final panelRect = tester.getRect(find.byType(MissionScenePanel));
+
+    expect(panelRect.bottom, stackRect.bottom);
+  });
+
   testWidgets(
     'menjalankan langkah sequence hingga selesai lalu aktifkan Selesaikan Misi',
     (tester) async {

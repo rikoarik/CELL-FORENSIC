@@ -85,6 +85,55 @@ void main() {
     },
   );
 
+  testWidgets('live AR shows a clear surface detection indicator', (
+    tester,
+  ) async {
+    final engine = LiveArSceneEngine();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MissionScenePanel(
+            useAr: true,
+            missionCode: 'MISI-1',
+            statusLabel: 'Menyiapkan',
+            stepLabel: '—',
+            sequenceCompleted: false,
+            onRunStep: () {},
+            sceneEngine: engine,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Mencari permukaan'), findsOneWidget);
+    expect(
+      find.byKey(const Key('mission-plane-detected-indicator')),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const Key('mission-debug-plane')));
+    await tester.pump();
+
+    expect(find.text('Permukaan terdeteksi'), findsNWidgets(2));
+    expect(
+      find.byKey(const Key('mission-plane-detected-indicator')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('mission-debug-place')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Objek AR siap'), findsOneWidget);
+    expect(
+      find.byKey(const Key('mission-plane-detected-indicator')),
+      findsNothing,
+    );
+
+    await engine.dispose();
+  });
+
   // --- Case 2 ---
   testWidgets(
     'W4-02 fallback on unsupported / init failure',

@@ -11,13 +11,13 @@ class SupabaseConfig {
   /// `flutter run --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...`
   static const url = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: 'https://sjkzhtrrtaheiahdswpe.supabase.co',
+    defaultValue: 'https://ycxcpjjnwycteakxfppy.supabase.co',
   );
 
   /// Publishable key only — never service_role.
   static const publishableKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
-    defaultValue: 'sb_publishable_hKkn6GYFMC3iNASbbE8tXQ_CjXdftjb',
+    defaultValue: 'sb_publishable_zVjn_CxpzwUCEuhbkkan5g_jnLH_V45',
   );
 
   static bool get isConfigured => url.isNotEmpty && publishableKey.isNotEmpty;
