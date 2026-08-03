@@ -22,11 +22,7 @@ import 'package:flutter/material.dart';
 /// Layout: full-bleed AR/3D preview; AI chat + logbook open via FAB sheets.
 /// Missions advance from matched intents — not a linear counter.
 class MissionScreen extends StatefulWidget {
-  const MissionScreen({
-    required this.journey,
-    this.capabilityProbe,
-    super.key,
-  });
+  const MissionScreen({required this.journey, this.capabilityProbe, super.key});
 
   final StudentJourney journey;
 
@@ -97,9 +93,7 @@ class _MissionScreenState extends State<MissionScreen> {
     if (!widget.journey.arSupported) return;
     final probe = widget.capabilityProbe;
     if (probe == null) return;
-    final result = await probe.probe(
-      requestCameraPermission: false,
-    );
+    final result = await probe.probe(requestCameraPermission: false);
     if (!mounted || !widget.journey.arSupported || result.supported) return;
     debugPrint('CellForensic live AR recheck failed; using 3D: $result');
     widget.journey.useFallback3d();
@@ -215,8 +209,11 @@ class _MissionScreenState extends State<MissionScreen> {
 
   Future<void> _initLabScene() async {
     final scenePath =
-        ArAssetRegistry.modelForStep(_mission.code, _sequence?.currentStep?.code) ??
-            ArAssetRegistry.primaryModelForMission(_mission.code);
+        ArAssetRegistry.modelForStep(
+          _mission.code,
+          _sequence?.currentStep?.code,
+        ) ??
+        ArAssetRegistry.primaryModelForMission(_mission.code);
     await _engine.initLabScene(
       labTableModelPath: scenePath,
       tempatUjiModelPath: null,
@@ -247,11 +244,7 @@ class _MissionScreenState extends State<MissionScreen> {
     var state = _sequenceEngine.start(_mission.sequence);
     final maxStep = _mission.sequence.steps.length;
     final target = stepIndex.clamp(0, maxStep);
-    for (
-      var i = 0;
-      i < target && state.status == SequenceStatus.running;
-      i++
-    ) {
+    for (var i = 0; i < target && state.status == SequenceStatus.running; i++) {
       state = _sequenceEngine.completeCurrentStep(state);
     }
     _sequence = state;
@@ -602,8 +595,7 @@ class _MissionScreenState extends State<MissionScreen> {
             _refreshWorkspaceSheet = () => setModalState(() {});
             final media = MediaQuery.of(context);
             final keyboard = media.viewInsets.bottom;
-            final available =
-                media.size.height - media.padding.top - keyboard;
+            final available = media.size.height - media.padding.top - keyboard;
             final height = (available * 0.72).clamp(280.0, available);
             return AnimatedPadding(
               duration: const Duration(milliseconds: 120),
@@ -638,6 +630,19 @@ class _MissionScreenState extends State<MissionScreen> {
     widget.journey.saveLogbook(entries);
   }
 
+  void _saveLogbookWithFeedback() {
+    _autosaveLogbook();
+    FocusScope.of(context).unfocus();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Logbook tersimpan'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
     final mission = _mission;
@@ -660,9 +665,7 @@ class _MissionScreenState extends State<MissionScreen> {
             child: Stack(
               key: const Key('mission-scene-stack'),
               children: [
-                Positioned.fill(
-                  child: _scenePanel(mission: mission),
-                ),
+                Positioned.fill(child: _scenePanel(mission: mission)),
                 // A fixed estimated popup height breaks with text scaling, so
                 // hide the FABs while a hotspot observation card is open.
                 if (!_hotspotPopupOpen)
@@ -677,9 +680,8 @@ class _MissionScreenState extends State<MissionScreen> {
                           key: const Key('assistant-fab'),
                           heroTag: 'mission-assistant-fab',
                           tooltip: 'Asisten AI',
-                          onPressed: () => unawaited(
-                            _openWorkspaceSheet(logbook: false),
-                          ),
+                          onPressed: () =>
+                              unawaited(_openWorkspaceSheet(logbook: false)),
                           child: const Icon(Icons.smart_toy_outlined),
                         ),
                         const SizedBox(height: 8),
@@ -687,9 +689,8 @@ class _MissionScreenState extends State<MissionScreen> {
                           key: const Key('mission-logbook-toggle'),
                           heroTag: 'mission-logbook-fab',
                           tooltip: 'Logbook',
-                          onPressed: () => unawaited(
-                            _openWorkspaceSheet(logbook: true),
-                          ),
+                          onPressed: () =>
+                              unawaited(_openWorkspaceSheet(logbook: true)),
                           child: const Icon(Icons.menu_book_outlined),
                         ),
                       ],
@@ -742,9 +743,7 @@ class _MissionScreenState extends State<MissionScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
             ),
             child: Text(
-              journey.allMissionsCompleted
-                  ? 'Kesimpulan'
-                  : 'Selesaikan',
+              journey.allMissionsCompleted ? 'Kesimpulan' : 'Selesaikan',
             ),
           ),
         ],
@@ -754,9 +753,7 @@ class _MissionScreenState extends State<MissionScreen> {
 
   Widget _scenePanel({required MissionContent mission}) {
     return MissionScenePanel(
-      key: ValueKey(
-        'scene-${mission.code}-ar=${widget.journey.arSupported}',
-      ),
+      key: ValueKey('scene-${mission.code}-ar=${widget.journey.arSupported}'),
       useAr: widget.journey.arSupported,
       missionCode: mission.code,
       stepCode: _sequence?.currentStep?.code,
@@ -777,9 +774,7 @@ class _MissionScreenState extends State<MissionScreen> {
           ?SampleAOrganelleHotspots.tryParse(raw),
       },
       onInspectedHotspotsChanged: (ids) {
-        widget.journey.saveInspectedOrganelleHotspots(
-          ids.map((e) => e.name),
-        );
+        widget.journey.saveInspectedOrganelleHotspots(ids.map((e) => e.name));
       },
       onHotspotAskAi: _onHotspotAskAi,
       onHotspotLogbook: _onHotspotLogbook,
@@ -872,14 +867,8 @@ class _MissionScreenState extends State<MissionScreen> {
         'amati organel pada sampel a',
         'Apa dampak kerusakan kloroplas?',
       ],
-      2 => const [
-        'cairan Sampel B bocor?',
-        'Apa fungsi membran sel?',
-      ],
-      3 => const [
-        'Kenapa bentuk Sampel A tetap?',
-        'Bandingkan Sampel A dan B',
-      ],
+      2 => const ['cairan Sampel B bocor?', 'Apa fungsi membran sel?'],
+      3 => const ['Kenapa bentuk Sampel A tetap?', 'Bandingkan Sampel A dan B'],
       _ => const <String>[],
     };
 
@@ -929,10 +918,7 @@ class _MissionScreenState extends State<MissionScreen> {
 
         final header = Row(
           children: [
-            Text(
-              'Asisten Investigasi',
-              style: theme.textTheme.titleSmall,
-            ),
+            Text('Asisten Investigasi', style: theme.textTheme.titleSmall),
             const SizedBox(width: 6),
             if (isBusy) ...[
               const SizedBox(
@@ -1088,6 +1074,13 @@ class _MissionScreenState extends State<MissionScreen> {
           ),
           const SizedBox(height: 6),
           Expanded(child: _logbookInline(mission: mission)),
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            key: const Key('logbook-save-button'),
+            onPressed: _saveLogbookWithFeedback,
+            icon: const Icon(Icons.save_outlined),
+            label: const Text('Simpan'),
+          ),
         ],
       ),
     );

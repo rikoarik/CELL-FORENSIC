@@ -2,6 +2,7 @@ import 'package:cell_forensic/ar/ar_asset_registry.dart';
 import 'package:cell_forensic/ar/ar_lifecycle_controller.dart';
 import 'package:cell_forensic/ar/ar_overlay_frame.dart';
 import 'package:cell_forensic/ar/ar_scene_engine.dart';
+import 'package:cell_forensic/ar/ar_scene_overlays.dart';
 import 'package:cell_forensic/ar/ar_visual_director.dart';
 import 'package:cell_forensic/ar/misi2_visual_helpers.dart';
 import 'package:cell_forensic/ar/misi3_visuals.dart';
@@ -39,51 +40,48 @@ void main() {
   ArSceneVisualState snapshot(ArSceneEngine engine) => engine.visualState;
 
   // --- Case 1 ---
-  testWidgets(
-    'W4-01 live AR success does not enter fallback',
-    (tester) async {
-      final engine = LiveArSceneEngine();
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: MissionScenePanel(
-              useAr: true,
-              missionCode: 'MISI-1',
-              statusLabel: 'Berjalan',
-              stepLabel: 'Langkah 1',
-              sequenceCompleted: false,
-              onRunStep: () {},
-              sceneEngine: engine,
-            ),
+  testWidgets('W4-01 live AR success does not enter fallback', (tester) async {
+    final engine = LiveArSceneEngine();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MissionScenePanel(
+            useAr: true,
+            missionCode: 'MISI-1',
+            statusLabel: 'Berjalan',
+            stepLabel: 'Langkah 1',
+            sequenceCompleted: false,
+            onRunStep: () {},
+            sceneEngine: engine,
           ),
         ),
-      );
-      await tester.pump();
+      ),
+    );
+    await tester.pump();
 
-      expect(engine.capabilities.isFallback, isFalse);
-      expect(find.byKey(const Key('mission-fallback-banner')), findsNothing);
-      expect(
-        tester.widget<Text>(find.byKey(const Key('mission-mode-label'))).data,
-        'Mode AR (Kamera)',
-      );
+    expect(engine.capabilities.isFallback, isFalse);
+    expect(find.byKey(const Key('mission-fallback-banner')), findsNothing);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('mission-mode-label'))).data,
+      'Mode AR (Kamera)',
+    );
 
-      await tester.tap(find.byKey(const Key('mission-debug-place')));
-      await tester.pump();
-      await tester.pump();
+    await tester.tap(find.byKey(const Key('mission-debug-place')));
+    await tester.pump();
+    await tester.pump();
 
-      expect(engine.placement, isNotNull);
-      expect(engine.capabilities.isFallback, isFalse);
-      expect(find.byKey(const Key('mission-fallback-banner')), findsNothing);
-      expect(
-        tester.widget<Text>(find.byKey(const Key('mission-mode-label'))).data,
-        'Mode AR (Kamera)',
-      );
-      // Placeholder path for tests — ModelViewer must still not mount.
-      expect(find.byType(ModelViewer), findsNothing);
+    expect(engine.placement, isNotNull);
+    expect(engine.capabilities.isFallback, isFalse);
+    expect(find.byKey(const Key('mission-fallback-banner')), findsNothing);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('mission-mode-label'))).data,
+      'Mode AR (Kamera)',
+    );
+    // Placeholder path for tests — ModelViewer must still not mount.
+    expect(find.byType(ModelViewer), findsNothing);
 
-      await engine.dispose();
-    },
-  );
+    await engine.dispose();
+  });
 
   testWidgets('live AR shows a clear surface detection indicator', (
     tester,
@@ -135,46 +133,54 @@ void main() {
   });
 
   // --- Case 2 ---
-  testWidgets(
-    'W4-02 fallback on unsupported / init failure',
-    (tester) async {
-      final live = LiveArSceneEngine();
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: MissionScenePanel(
-              useAr: true,
-              missionCode: 'MISI-1',
-              statusLabel: 'Menyiapkan',
-              stepLabel: 'Tempatkan model',
-              sequenceCompleted: false,
-              onRunStep: () {},
-              sceneEngine: live,
-            ),
+  testWidgets('W4-02 fallback on unsupported / init failure', (tester) async {
+    final live = LiveArSceneEngine();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MissionScenePanel(
+            useAr: true,
+            missionCode: 'MISI-1',
+            statusLabel: 'Menyiapkan',
+            stepLabel: 'Tempatkan model',
+            sequenceCompleted: false,
+            onRunStep: () {},
+            sceneEngine: live,
           ),
         ),
-      );
-      await tester.pump();
+      ),
+    );
+    await tester.pump();
 
-      await tester.tap(find.byKey(const Key('mission-debug-force-fallback')));
-      await tester.pump();
-      await tester.pump();
+    await tester.tap(find.byKey(const Key('mission-debug-force-fallback')));
+    await tester.pump();
+    await tester.pump();
 
-      expect(
-        tester.widget<Text>(find.byKey(const Key('mission-mode-label'))).data,
-        'Mode 3D Viewer',
-      );
-      expect(find.byKey(const Key('mission-fallback-banner')), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('mission-mode-label'))).data,
+      'Mode 3D Viewer',
+    );
+    expect(find.byKey(const Key('mission-fallback-banner')), findsOneWidget);
 
-      await live.dispose();
+    await const ArVisualDirector().applySequenceStep(
+      live,
+      missionCode: 'MISI-2',
+      stepCode: 'play_leak_particles',
+    );
+    await tester.pump();
+    expect(live.visualState.overlay, ArOverlayEffect.waterLeak);
+    final overlay = buildSequenceOverlay(live.visualState);
+    expect(overlay, isA<ArSceneOverlayLayer>());
+    expect(overlay.effect, ArOverlayEffect.waterLeak);
 
-      // Unsupported device path uses Fake engine capability flag.
-      final fake = FakeArSceneEngine();
-      expect(fake.capabilities.isFallback, isTrue);
-      expect(fake.capabilities.supportsPlaneDetection, isFalse);
-      await fake.dispose();
-    },
-  );
+    await live.dispose();
+
+    // Unsupported device path uses Fake engine capability flag.
+    final fake = FakeArSceneEngine();
+    expect(fake.capabilities.isFallback, isTrue);
+    expect(fake.capabilities.supportsPlaneDetection, isFalse);
+    await fake.dispose();
+  });
 
   // --- Case 3 ---
   test('W4-03 same anchor across M1/M2/M3 steps', () async {
@@ -219,15 +225,12 @@ void main() {
     await initLab(engine);
 
     final m1Steps = MissionSequences.misi1.steps.map((s) => s.code).toList();
-    expect(
-      m1Steps,
-      [
-        SequenceStepCodes.focusSampleA,
-        SequenceStepCodes.zoomInternal,
-        SequenceStepCodes.glowOrganelles,
-        SequenceStepCodes.playShrinkAnimation,
-      ],
-    );
+    expect(m1Steps, [
+      SequenceStepCodes.focusSampleA,
+      SequenceStepCodes.zoomInternal,
+      SequenceStepCodes.glowOrganelles,
+      SequenceStepCodes.playShrinkAnimation,
+    ]);
     expect(m1Steps, isNot(contains(SequenceStepCodes.focusSampleB)));
     expect(m1Steps, isNot(contains(SequenceStepCodes.showBothSamples)));
 
@@ -257,10 +260,7 @@ void main() {
     expect(m1Overlays, isNot(contains(ArOverlayEffect.comparisonLabels)));
     expect(engine.visualState.activeModelPath, ArAssetRegistry.vakuolaMainSolo);
     expect(engine.visualState.secondaryModelPath, isNull);
-    expect(
-      engine.visualState.activeModelPath,
-      isNot(ArAssetRegistry.sampleB),
-    );
+    expect(engine.visualState.activeModelPath, isNot(ArAssetRegistry.sampleB));
     expect(
       engine.visualState.activeModelPath,
       isNot(ArAssetRegistry.rantaiProtein),
@@ -279,15 +279,12 @@ void main() {
     await initLab(engine);
 
     final m2Steps = MissionSequences.misi2.steps.map((s) => s.code).toList();
-    expect(
-      m2Steps,
-      [
-        SequenceStepCodes.focusSampleB,
-        SequenceStepCodes.zoomMembrane,
-        SequenceStepCodes.showTornBilayer,
-        SequenceStepCodes.playLeakParticles,
-      ],
-    );
+    expect(m2Steps, [
+      SequenceStepCodes.focusSampleB,
+      SequenceStepCodes.zoomMembrane,
+      SequenceStepCodes.showTornBilayer,
+      SequenceStepCodes.playLeakParticles,
+    ]);
     expect(m2Steps, isNot(contains(SequenceStepCodes.glowOrganelles)));
     expect(m2Steps, isNot(contains(SequenceStepCodes.showForceArrows)));
 
@@ -336,16 +333,13 @@ void main() {
     await initLab(engine);
 
     final m3Steps = MissionSequences.misi3.steps.map((s) => s.code).toList();
-    expect(
-      m3Steps,
-      [
-        SequenceStepCodes.showDamagedSampleA,
-        SequenceStepCodes.showBothSamples,
-        SequenceStepCodes.highlightCellWall,
-        SequenceStepCodes.markSampleB,
-        SequenceStepCodes.showForceArrows,
-      ],
-    );
+    expect(m3Steps, [
+      SequenceStepCodes.showDamagedSampleA,
+      SequenceStepCodes.showBothSamples,
+      SequenceStepCodes.highlightCellWall,
+      SequenceStepCodes.markSampleB,
+      SequenceStepCodes.showForceArrows,
+    ]);
     expect(m3Steps, isNot(contains(SequenceStepCodes.playLeakParticles)));
     expect(m3Steps, isNot(contains(SequenceStepCodes.playShrinkAnimation)));
 
@@ -380,10 +374,7 @@ void main() {
     expect(m3Overlays, isNot(contains(ArOverlayEffect.waterLeak)));
     expect(m3Overlays, isNot(contains(ArOverlayEffect.vacuoleDamage)));
     expect(m3Overlays, isNot(contains(ArOverlayEffect.membraneDamage)));
-    expect(
-      engine.visualState.activeModelPath,
-      ArAssetRegistry.dindingSelSolo,
-    );
+    expect(engine.visualState.activeModelPath, ArAssetRegistry.dindingSelSolo);
     expect(
       engine.visualState.activeModelPath,
       isNot(ArAssetRegistry.mitokondriaSolo),
@@ -496,55 +487,54 @@ void main() {
   });
 
   // --- Case 10 ---
-  testWidgets(
-    'W4-10 lifecycle pause does not advance sequence',
-    (tester) async {
-      final engine = FakeArSceneEngine();
-      final lifecycle = ArLifecycleController(engine);
-      var seq = sequenceEngine.start(MissionSequences.misi2);
-      final stepAtPause = seq.stepIndex;
-      final codeAtPause = seq.currentStep?.code;
+  testWidgets('W4-10 lifecycle pause does not advance sequence', (
+    tester,
+  ) async {
+    final engine = FakeArSceneEngine();
+    final lifecycle = ArLifecycleController(engine);
+    var seq = sequenceEngine.start(MissionSequences.misi2);
+    final stepAtPause = seq.stepIndex;
+    final codeAtPause = seq.currentStep?.code;
 
-      lifecycle.handleAppLifecycle(AppLifecycleState.paused);
-      expect(engine.isPaused, isTrue);
+    lifecycle.handleAppLifecycle(AppLifecycleState.paused);
+    expect(engine.isPaused, isTrue);
 
-      var runs = 0;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: MissionScenePanel(
-              useAr: true,
-              missionCode: 'MISI-2',
-              statusLabel: 'Dijeda',
-              stepLabel: codeAtPause ?? '',
-              sequenceCompleted: false,
-              sequencePaused: true,
-              onRunStep: () {
-                runs++;
-                seq = sequenceEngine.completeCurrentStep(seq);
-              },
-              sceneEngine: engine,
-            ),
+    var runs = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MissionScenePanel(
+            useAr: true,
+            missionCode: 'MISI-2',
+            statusLabel: 'Dijeda',
+            stepLabel: codeAtPause ?? '',
+            sequenceCompleted: false,
+            sequencePaused: true,
+            onRunStep: () {
+              runs++;
+              seq = sequenceEngine.completeCurrentStep(seq);
+            },
+            sceneEngine: engine,
           ),
         ),
-      );
-      await tester.pump();
-      await tester.tap(find.byKey(const Key('mission-debug-place')));
-      await tester.pump();
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('mission-debug-place')));
+    await tester.pump();
 
-      expect(
-        tester
-            .widget<FilledButton>(find.byKey(const Key('mission-run-step')))
-            .onPressed,
-        isNull,
-      );
-      expect(runs, 0);
-      expect(seq.stepIndex, stepAtPause);
-      expect(seq.currentStep?.code, codeAtPause);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('mission-run-step')))
+          .onPressed,
+      isNull,
+    );
+    expect(runs, 0);
+    expect(seq.stepIndex, stepAtPause);
+    expect(seq.currentStep?.code, codeAtPause);
 
-      await engine.dispose();
-    },
-  );
+    await engine.dispose();
+  });
 
   // --- Case 11 ---
   test('W4-11 resume continues same step', () async {

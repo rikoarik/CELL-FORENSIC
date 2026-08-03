@@ -17,6 +17,7 @@ class ResultsScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final score = journey.objectiveScore;
     final pending = journey.pendingTeacherReview;
+    final investigationOnly = journey.submittedStationCodes.isEmpty;
 
     return Scaffold(
       body: SafeArea(
@@ -33,49 +34,57 @@ class ResultsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Praktikum selesai!',
+                investigationOnly
+                    ? 'Investigasi berhasil dikirim!'
+                    : 'Praktikum selesai!',
+                key: const Key('results-success-title'),
                 textAlign: TextAlign.center,
                 style: theme.textTheme.headlineMedium,
               ),
               const SizedBox(height: 8),
               Text(
-                'Terima kasih sudah menyelesaikan seluruh stasiun evaluasi. '
-                'Kerja bagus, tim!',
+                investigationOnly
+                    ? 'Kesimpulan kelompok sudah tersimpan. Kerja bagus, tim!'
+                    : 'Terima kasih sudah menyelesaikan seluruh stasiun '
+                          'evaluasi. Kerja bagus, tim!',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyLarge,
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Stasiun terkunci: ${journey.submittedStationCodes.length} dari '
-                '${journey.stationCount}',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+              if (!investigationOnly) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Stasiun terkunci: '
+                  '${journey.submittedStationCodes.length} dari '
+                  '${journey.stationCount}',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              Semantics(
-                label: 'Skor objektif otomatis $score poin',
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      children: [
-                        Text(
-                          'Skor Objektif (Otomatis)',
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '$score poin',
-                          style: theme.textTheme.displaySmall,
-                        ),
-                      ],
+                const SizedBox(height: 24),
+                Semantics(
+                  label: 'Skor objektif otomatis $score poin',
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          Text(
+                            'Skor Objektif (Otomatis)',
+                            style: theme.textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '$score poin',
+                            style: theme.textTheme.displaySmall,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              if (pending) ...[
+              ],
+              if (!investigationOnly && pending) ...[
                 const SizedBox(height: 16),
                 Semantics(
                   label: 'Jawaban esai masih menunggu penilaian dari guru',
@@ -102,6 +111,13 @@ class ResultsScreen extends StatelessWidget {
                   ),
                 ),
               ],
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                key: const Key('results-start-over'),
+                onPressed: journey.resetToStart,
+                icon: const Icon(Icons.restart_alt_rounded),
+                label: const Text('Kembali ke Awal'),
+              ),
             ],
           ),
         ),

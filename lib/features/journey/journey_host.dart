@@ -8,6 +8,8 @@ import 'package:cell_forensic/features/journey/screens/intro/join_group_screen.d
 import 'package:cell_forensic/features/journey/screens/intro/onboarding_screen.dart';
 import 'package:cell_forensic/features/journey/screens/investigation/conclusion_screen.dart';
 import 'package:cell_forensic/features/journey/screens/investigation/mission_screen.dart';
+import 'package:cell_forensic/features/journey/screens/stations/results_screen.dart';
+import 'package:cell_forensic/features/journey/screens/stations/station_screen.dart';
 import 'package:cell_forensic/features/journey/student_journey.dart';
 import 'package:cell_forensic/features/journey/widgets/journey_progress_bar.dart';
 import 'package:cell_forensic/features/session/in_memory_session_repository.dart';
@@ -84,7 +86,11 @@ class _JourneyHostState extends State<JourneyHost> {
     final store = _snapshotStore;
     if (store == null) return;
     final snap = _journey.toSessionSnapshot();
-    if (snap != null) store.save(snap);
+    if (snap == null) {
+      store.clear();
+      return;
+    }
+    store.save(snap);
   }
 
   @override
@@ -101,7 +107,8 @@ class _JourneyHostState extends State<JourneyHost> {
       builder: (context, _) {
         final screen = switch (_journey.stage) {
           JourneyStage.deviceCheck => DeviceCheckScreen(journey: _journey),
-          JourneyStage.joinSession || JourneyStage.groupSetup => JoinGroupScreen(
+          JourneyStage.joinSession ||
+          JourneyStage.groupSetup => JoinGroupScreen(
             journey: _journey,
             sessionRepository: _sessionRepository,
             snapshotStore: _snapshotStore,
@@ -111,9 +118,9 @@ class _JourneyHostState extends State<JourneyHost> {
             journey: _journey,
             capabilityProbe: ArCapabilityProbe(),
           ),
-          JourneyStage.conclusion ||
-          JourneyStage.stations ||
-          JourneyStage.results => ConclusionScreen(journey: _journey),
+          JourneyStage.conclusion => ConclusionScreen(journey: _journey),
+          JourneyStage.stations => StationScreen(journey: _journey),
+          JourneyStage.results => ResultsScreen(journey: _journey),
         };
         return Column(
           children: [

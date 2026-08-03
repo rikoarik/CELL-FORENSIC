@@ -17,10 +17,52 @@ void main() {
     expect(find.textContaining('AR'), findsWidgets);
 
     journey.completeDeviceCheck(arSupported: false);
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     // Join stage shows the seeded local join code field.
     expect(find.byKey(const Key('joinCodeField')), findsOneWidget);
     expect(find.textContaining('CELL01'), findsWidgets);
+  });
+
+  testWidgets('submit investigation shows success and reset clears snapshot', (
+    tester,
+  ) async {
+    final db = LocalDatabase(InMemoryStorageBackend());
+    final store = SessionSnapshotStore(db);
+    final journey = StudentJourney(content: buildLocalContentPack())
+      ..completeDeviceCheck(arSupported: false)
+      ..joinWithGroup(groupName: 'Tim A', leaderName: 'Budi')
+      ..debugCompleteAllMissionsToConclusion();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: JourneyHost(
+          journey: journey,
+          snapshotStore: store,
+          restoreSnapshot: false,
+        ),
+      ),
+    );
+
+    journey.submitInvestigation(
+      sampleAIdentity: 'Sel tumbuhan',
+      sampleAReasoning: 'Dinding sel',
+      sampleBIdentity: 'Sel hewan',
+      sampleBReasoning: 'Membran robek',
+      hypothesis: 'Bukti mendukung.',
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Investigasi berhasil dikirim!'), findsOneWidget);
+    expect(store.loadActive(), isNotNull);
+
+    await tester.tap(find.byKey(const Key('results-start-over')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(journey.stage, JourneyStage.deviceCheck);
+    expect(store.loadActive(), isNull);
   });
 
   testWidgets(

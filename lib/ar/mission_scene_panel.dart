@@ -116,6 +116,18 @@ double combineLiveNodeScale({
   return baseScale * gestureScale * seqFactor;
 }
 
+/// Builds the sequence overlay shared by live AR and the fallback 3D viewer.
+@visibleForTesting
+ArSceneOverlayLayer buildSequenceOverlay(ArSceneVisualState visual) {
+  return ArSceneOverlayLayer(
+    key: const Key('mission-sequence-overlay'),
+    effect: visual.overlay,
+    highlightTarget: visual.highlightTarget,
+    opacity: visual.opacity,
+    dualSamples: visual.secondaryModelPath != null,
+  );
+}
+
 class _NormalizedNodeTransform {
   const _NormalizedNodeTransform({
     required this.matrix,
@@ -881,12 +893,7 @@ class _MissionScenePanelState extends State<MissionScenePanel>
               style: TextStyle(color: Colors.white70),
             ),
           ),
-          ArSceneOverlayLayer(
-            effect: visual.overlay,
-            highlightTarget: visual.highlightTarget,
-            opacity: visual.opacity,
-            dualSamples: visual.secondaryModelPath != null,
-          ),
+          buildSequenceOverlay(visual),
           _buildHotspotLayer(dualSamples: visual.secondaryModelPath != null),
           if (widget.sequencePaused)
             ColoredBox(
@@ -985,10 +992,12 @@ class _MissionScenePanelState extends State<MissionScenePanel>
     final visual = widget.sceneEngine.visualState;
     final step = widget.stepCode;
 
-    // Same mapping as AR: registry drives scene GLB per mission + step.
-    final glbPath =
-        ArAssetRegistry.modelForStep(widget.missionCode, step) ??
-        ArAssetRegistry.primaryModelForMission(widget.missionCode);
+    // Same mapping as AR: prefer the engine's active model after the visual
+    // director swaps a sequence step, then fall back to the registry mapping.
+    final glbPath = visual.activeModelPath?.isNotEmpty == true
+        ? visual.activeModelPath!
+        : (ArAssetRegistry.modelForStep(widget.missionCode, step) ??
+              ArAssetRegistry.primaryModelForMission(widget.missionCode));
     final src = ArAssetRegistry.modelViewerSrc(glbPath, forWeb: kIsWeb);
     final bounds = ArModelPlacementConfigs.auditedBoundsFor(glbPath);
     final sequenceScale = _sequenceScaleFor(ArNodeIds.primary) ?? ArVec3.one;
@@ -1035,13 +1044,9 @@ class _MissionScenePanelState extends State<MissionScenePanel>
           loading: Loading.eager,
           relatedCss: 'body{margin:0;background:#1A1F24}',
         ),
-        if (_wantsLiveAr)
-          ArSceneOverlayLayer(
-            effect: visual.overlay,
-            highlightTarget: visual.highlightTarget,
-            opacity: visual.opacity,
-            dualSamples: false,
-          ),
+        // model_viewer cannot render native material glow/particles. Flutter
+        // overlays provide the same visible sequence beats as live AR.
+        buildSequenceOverlay(visual),
         _buildModelTapLayer(dualSamples: false),
       ],
     );
@@ -1076,12 +1081,7 @@ class _MissionScenePanelState extends State<MissionScenePanel>
           planeDetectionConfig: PlaneDetectionConfig.horizontal,
         ),
         if (_scanPhase == ArScanPhase.placed) ...[
-          ArSceneOverlayLayer(
-            effect: visual.overlay,
-            highlightTarget: visual.highlightTarget,
-            opacity: visual.opacity,
-            dualSamples: visual.secondaryModelPath != null,
-          ),
+          buildSequenceOverlay(visual),
           _buildHotspotLayer(dualSamples: visual.secondaryModelPath != null),
         ],
         if (_scanPhase != ArScanPhase.placed)

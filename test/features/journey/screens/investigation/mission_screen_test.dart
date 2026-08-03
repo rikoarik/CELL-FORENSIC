@@ -77,7 +77,9 @@ void main() {
     expect(find.textContaining('Tanya Asisten AI'), findsWidgets);
   });
 
-  testWidgets('panel AR fallback mulai dari Misi 1 setelah place', (tester) async {
+  testWidgets('panel AR fallback mulai dari Misi 1 setelah place', (
+    tester,
+  ) async {
     final journey = _investigatingJourney();
     await tester.pumpWidget(_wrap(MissionScreen(journey: journey)));
 
@@ -101,10 +103,7 @@ void main() {
     await tester.tap(vacuole);
     await tester.pump();
 
-    expect(
-      find.byKey(const Key('organelle-popup-vacuole')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('organelle-popup-vacuole')), findsOneWidget);
     expect(find.byKey(_assistantFabKey), findsNothing);
     expect(find.byKey(_logbookFabKey), findsNothing);
 
@@ -115,7 +114,9 @@ void main() {
     expect(find.byKey(_logbookFabKey), findsOneWidget);
   });
 
-  testWidgets('panel scene memenuhi area bawah tanpa gap kosong', (tester) async {
+  testWidgets('panel scene memenuhi area bawah tanpa gap kosong', (
+    tester,
+  ) async {
     final journey = _investigatingJourney()..startMissionFromIntent(1);
     await tester.pumpWidget(_wrap(MissionScreen(journey: journey)));
     await tester.pump();
@@ -170,10 +171,7 @@ void main() {
       expect(journey.missionStatus(1), MissionStatus.completed);
       expect(journey.missionStatus(2), MissionStatus.running);
       expect(journey.activeMission.code, 'MISI-2');
-      expect(
-        find.textContaining('Misi 2 — Analisis'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('Misi 2 — Analisis'), findsOneWidget);
     },
   );
 
@@ -246,6 +244,22 @@ void main() {
     expect(saved!.values, contains(answer));
   });
 
+  testWidgets('tombol Simpan mengonfirmasi logbook tersimpan', (tester) async {
+    final journey = _investigatingJourney()..startMissionFromIntent(1);
+    await tester.pumpWidget(_wrap(MissionScreen(journey: journey)));
+
+    await _openLogbook(tester);
+
+    const answer = 'Membran sel tampak rusak';
+    await tester.enterText(find.byKey(const Key('logbook-field-0')), answer);
+    await tester.ensureVisible(find.byKey(const Key('logbook-save-button')));
+    await tester.tap(find.byKey(const Key('logbook-save-button')));
+    await tester.pump();
+
+    expect(find.text('Logbook tersimpan'), findsOneWidget);
+    expect(journey.logbookByMission['MISI-1']!.values, contains(answer));
+  });
+
   testWidgets('assistant draft dan logbook tetap saat upgrade ke live AR', (
     tester,
   ) async {
@@ -273,7 +287,8 @@ void main() {
 
     expect(find.byKey(const Key('assistant-tab-view-logbook')), findsOneWidget);
     expect(
-      tester.widget<TextField>(find.byKey(const Key('logbook-field-0')))
+      tester
+          .widget<TextField>(find.byKey(const Key('logbook-field-0')))
           .controller
           ?.text,
       'catatan sebelum upgrade',
@@ -371,24 +386,20 @@ void main() {
     expect(find.byKey(const Key('mission-tracking-lost')), findsNothing);
   });
 
-  testWidgets(
-    'misi 2 dan 3 memakai sequence + briefing masing-masing',
-    (tester) async {
-      final journey = _investigatingJourney()..startMissionFromIntent(2);
-      await tester.pumpWidget(_wrap(MissionScreen(journey: journey)));
-      expect(find.textContaining('Misi 2 — Analisis'), findsOneWidget);
+  testWidgets('misi 2 dan 3 memakai sequence + briefing masing-masing', (
+    tester,
+  ) async {
+    final journey = _investigatingJourney()..startMissionFromIntent(2);
+    await tester.pumpWidget(_wrap(MissionScreen(journey: journey)));
+    expect(find.textContaining('Misi 2 — Analisis'), findsOneWidget);
 
-      journey.startMissionFromIntent(3);
-      await tester.pumpAndSettle();
-      expect(
-        find.textContaining('Menyelidiki perbedaan'),
-        findsOneWidget,
-      );
+    journey.startMissionFromIntent(3);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Menyelidiki perbedaan'), findsOneWidget);
 
-      await _runSequenceToCompletion(tester, journey);
-      expect(find.textContaining('Selesai'), findsWidgets);
-    },
-  );
+    await _runSequenceToCompletion(tester, journey);
+    expect(find.textContaining('Selesai'), findsWidgets);
+  });
 
   testWidgets('memulihkan progres sequence mid-misi dari snapshot journey', (
     tester,

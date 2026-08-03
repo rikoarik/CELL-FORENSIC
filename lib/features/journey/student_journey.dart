@@ -54,6 +54,7 @@ class StudentJourney extends ChangeNotifier {
   String? _remoteGroupId;
   int _missionIndex = 0;
   bool _labPlaced = false;
+
   /// Intent-driven progress — empty until AR placement (no orphan seed).
   final Map<String, MissionProgress> _missionProgress = {};
   int _stationIndex = 0;
@@ -195,7 +196,9 @@ class StudentJourney extends ChangeNotifier {
       JourneyStage.conclusion => JourneyStage.investigating,
       JourneyStage.stations => JourneyStage.conclusion,
       JourneyStage.results =>
-        content.stations.isEmpty ? JourneyStage.conclusion : JourneyStage.stations,
+        content.stations.isEmpty
+            ? JourneyStage.conclusion
+            : JourneyStage.stations,
     };
     if (prev == null) return;
     _transition(prev);
@@ -287,6 +290,39 @@ class StudentJourney extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Clears the completed student session and returns to the first screen.
+  ///
+  /// Remote submissions remain queued/sent; this only clears local journey
+  /// state so another group can start cleanly on the same device.
+  void resetToStart() {
+    _stage = JourneyStage.deviceCheck;
+    _arSupported = false;
+    _joinCode = null;
+    _sessionId = null;
+    _sessionTitle = null;
+    _groupName = null;
+    _leaderName = null;
+    _group = null;
+    _remoteSessionId = null;
+    _remoteGroupId = null;
+    _missionIndex = 0;
+    _labPlaced = false;
+    _missionProgress.clear();
+    _stationIndex = 0;
+    _activeStationUnlocked = false;
+    _stationExpiresAt = null;
+    _submittedStationCodes.clear();
+    _lastError = null;
+    sequenceStepIndex = null;
+    sequenceCompleted = false;
+    logbookByMission.clear();
+    inspectedOrganelleHotspots.clear();
+    conclusionDraft = null;
+    conclusion = null;
+    _answers.clear();
+    notifyListeners();
+  }
+
   /// Joins the local session and registers the group in one step.
   ///
   /// Convenience for tests and legacy callers; the live UI uses
@@ -346,8 +382,9 @@ class StudentJourney extends ChangeNotifier {
     _leaderName = leader?.displayName;
     _remoteSessionId = snapshot.remoteSessionId;
     _remoteGroupId = snapshot.remoteGroupId;
-    final maxMission =
-        content.missions.isEmpty ? 0 : content.missions.length - 1;
+    final maxMission = content.missions.isEmpty
+        ? 0
+        : content.missions.length - 1;
     _missionIndex = snapshot.missionIndex.clamp(0, maxMission);
     sequenceStepIndex = snapshot.sequenceStepIndex;
     sequenceCompleted = snapshot.sequenceCompleted;
@@ -376,15 +413,17 @@ class StudentJourney extends ChangeNotifier {
     logbookByMission
       ..clear()
       ..addAll({
-        for (final e in snapshot.logbookByMission.entries) e.key: Map.of(e.value),
+        for (final e in snapshot.logbookByMission.entries)
+          e.key: Map.of(e.value),
       });
     inspectedOrganelleHotspots
       ..clear()
       ..addAll(snapshot.inspectedOrganelleHotspots);
     conclusionDraft = snapshot.conclusionDraft;
 
-    final maxStation =
-        content.stations.isEmpty ? 0 : content.stations.length - 1;
+    final maxStation = content.stations.isEmpty
+        ? 0
+        : content.stations.length - 1;
     _stationIndex = snapshot.stationIndex.clamp(0, maxStation);
     _activeStationUnlocked = snapshot.activeStationUnlocked;
     _stationExpiresAt = snapshot.stationExpiresAtMs == null
@@ -466,8 +505,8 @@ class StudentJourney extends ChangeNotifier {
     if (code == null || sid == null || group == null) return null;
 
     final persistStage = switch (_stage) {
-      JourneyStage.deviceCheck || JourneyStage.joinSession =>
-        JourneyStage.groupSetup,
+      JourneyStage.deviceCheck ||
+      JourneyStage.joinSession => JourneyStage.groupSetup,
       _ => _stage,
     };
 
@@ -726,9 +765,7 @@ class StudentJourney extends ChangeNotifier {
     _activeStationUnlocked = false;
     _stationExpiresAt = null;
     _submittedStationCodes.clear();
-    _transition(
-      JourneyStage.results,
-    );
+    _transition(JourneyStage.results);
   }
 
   Conclusion? conclusion;
