@@ -113,8 +113,14 @@ Deno.serve(async (req) => {
     });
 
     if (!upstream.ok) {
-      // Do not leak upstream body that might echo secrets.
-      return json({ error: "upstream_ai_failed", status: upstream.status }, 502);
+      // Surface only short, filtered diagnostics. Never return raw upstream
+      // payloads because a provider could echo request headers or secrets.
+      const diagnostic = await safeUpstreamDiagnostic(upstream);
+      return json({
+        error: "upstream_ai_failed",
+        status: upstream.status,
+        ...diagnostic,
+      }, 502);
     }
 
     const payload = await upstream.json();
@@ -151,6 +157,28 @@ function sanitizeAction(value: unknown): string {
 function clamp01(n: number): number {
   if (Number.isNaN(n)) return 0;
   return Math.min(1, Math.max(0, n));
+}
+
+async function safeUpstreamDiagnostic(
+  response: Response,
+): Promise<Record<string, string>> {
+  const payload = await response.json().catch(() => null);
+  if (!payload || typeof payload !== "object") return {};
+  const error = (payload as Record<string, unknown>).error;
+  const source = error && typeof error === "object"
+    ? error as Record<string, unknown>
+    : payload as Record<string, unknown>;
+  const code = cleanDiagnostic(source.code ?? source.type);
+  const message = cleanDiagnostic(source.message);
+  return {
+    ...(code ? { upstream_code: code } : {}),
+    ...(message ? { upstream_message: message } : {}),
+  };
+}
+
+function cleanDiagnostic(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value.replace(/[^a-zA-Z0-9 _./:-]/g, "").trim().slice(0, 160);
 }
 
 function parseModelJson(content: unknown): Record<string, unknown> | null {

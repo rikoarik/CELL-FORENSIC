@@ -118,14 +118,73 @@ double combineLiveNodeScale({
 
 /// Builds the sequence overlay shared by live AR and the fallback 3D viewer.
 @visibleForTesting
-ArSceneOverlayLayer buildSequenceOverlay(ArSceneVisualState visual) {
+ArSceneOverlayLayer buildSequenceOverlay(
+  ArSceneVisualState visual, {
+  bool? dualSamples,
+}) {
   return ArSceneOverlayLayer(
     key: const Key('mission-sequence-overlay'),
     effect: visual.overlay,
     highlightTarget: visual.highlightTarget,
     opacity: visual.opacity,
-    dualSamples: visual.secondaryModelPath != null,
+    dualSamples: dualSamples ?? visual.secondaryModelPath != null,
   );
+}
+
+/// Screen-space camera choreography for the persistent fallback 3D viewer.
+///
+/// `model_viewer_plus` rebuilds its underlying HTML/WebView when its widget key
+/// changes. Keeping the viewer stable and animating this frame avoids a white
+/// flash between steps while still focusing the authored A/B positions inside
+/// the merged lab GLB.
+@immutable
+class FallbackCameraPose {
+  const FallbackCameraPose({required this.scale, required this.slide});
+
+  final double scale;
+  final Offset slide;
+}
+
+@visibleForTesting
+FallbackCameraPose fallbackCameraPoseFor({
+  required String missionCode,
+  required String? stepCode,
+  required ArSceneVisualState visual,
+}) {
+  const sampleA = Offset(0.16, 0.01);
+  const sampleB = Offset(-0.16, 0.01);
+  const comparison = Offset.zero;
+
+  final stepScale = switch ((missionCode, stepCode)) {
+    ('MISI-1', 'focus_sample_a') => 1.18,
+    ('MISI-1', 'zoom_internal') => 1.55,
+    ('MISI-1', 'glow_organelles') => 1.38,
+    ('MISI-1', 'play_shrink_animation') => 1.42,
+    ('MISI-2', 'focus_sample_b') => 1.18,
+    ('MISI-2', 'zoom_membrane') => 1.55,
+    ('MISI-2', 'show_torn_bilayer') => 1.65,
+    ('MISI-2', 'play_leak_particles') => 1.65,
+    ('MISI-3', 'show_damaged_sample_a') => 1.35,
+    ('MISI-3', 'show_both_samples') => 1.0,
+    ('MISI-3', 'highlight_cell_wall') => 1.4,
+    ('MISI-3', 'mark_sample_b') => 1.3,
+    ('MISI-3', 'show_force_arrows') => 1.08,
+    _ => 1.0,
+  };
+  final engineScale = visual.zoomFactor.clamp(1.0, 2.0);
+  final scale = math.max(stepScale, engineScale) * visual.userScale;
+
+  final slide = switch ((missionCode, stepCode)) {
+    ('MISI-1', _) => sampleA,
+    ('MISI-2', _) => sampleB,
+    ('MISI-3', 'show_damaged_sample_a') => sampleA,
+    ('MISI-3', 'highlight_cell_wall') => sampleA,
+    ('MISI-3', 'mark_sample_b') => sampleB,
+    ('MISI-3', _) => comparison,
+    _ => comparison,
+  };
+
+  return FallbackCameraPose(scale: scale.clamp(0.7, 2.5), slide: slide);
 }
 
 class _NormalizedNodeTransform {
@@ -202,6 +261,12 @@ class _MissionScenePanelState extends State<MissionScenePanel>
   }
 
   bool get _wantsLiveAr => widget.useAr && !_liveInitFailed;
+
+  bool get _supportsPlantHotspots => widget.missionCode != 'MISI-2';
+
+  bool get _showsBothSamples =>
+      widget.missionCode == 'MISI-3' &&
+      widget.stepCode != 'show_damaged_sample_a';
 
   bool get _canRunStep {
     if (widget.sequenceCompleted || widget.sequencePaused) return false;
@@ -893,8 +958,9 @@ class _MissionScenePanelState extends State<MissionScenePanel>
               style: TextStyle(color: Colors.white70),
             ),
           ),
-          buildSequenceOverlay(visual),
-          _buildHotspotLayer(dualSamples: visual.secondaryModelPath != null),
+          buildSequenceOverlay(visual, dualSamples: _showsBothSamples),
+          if (_supportsPlantHotspots)
+            _buildHotspotLayer(dualSamples: _showsBothSamples),
           if (widget.sequencePaused)
             ColoredBox(
               color: Colors.black54,
@@ -1000,13 +1066,7 @@ class _MissionScenePanelState extends State<MissionScenePanel>
               ArAssetRegistry.primaryModelForMission(widget.missionCode));
     final src = ArAssetRegistry.modelViewerSrc(glbPath, forWeb: kIsWeb);
     final bounds = ArModelPlacementConfigs.auditedBoundsFor(glbPath);
-    final sequenceScale = _sequenceScaleFor(ArNodeIds.primary) ?? ArVec3.one;
-    final sequenceMultiplier =
-        (sequenceScale.x + sequenceScale.y + sequenceScale.z) / 3;
-    final normalizedScale = _placementConfig.uniformScaleFor(
-      bounds,
-      multiplier: _gestureScale * sequenceMultiplier,
-    );
+    final normalizedScale = _placementConfig.uniformScaleFor(bounds);
     final rotationY = _rotationYFor(ArNodeIds.primary);
     final rotationDegrees = rotationY * 180 / math.pi;
     final cameraTarget = _placementConfig.modelViewerCameraTarget(
@@ -1014,41 +1074,70 @@ class _MissionScenePanelState extends State<MissionScenePanel>
       normalizedScale,
       rotationYRadians: rotationY,
     );
-    final orbit = ArAssetRegistry.cameraOrbitForStep(step);
+    final pose = fallbackCameraPoseFor(
+      missionCode: widget.missionCode,
+      stepCode: step,
+      visual: visual,
+    );
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        ModelViewer(
-          key: ValueKey(
-            'mv-lab-$glbPath-$step-$normalizedScale-$rotationDegrees',
+    return ClipRect(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          AnimatedSlide(
+            key: const Key('model-viewer-camera-slide'),
+            offset: pose.slide,
+            duration: const Duration(milliseconds: 650),
+            curve: Curves.easeInOutCubic,
+            child: AnimatedScale(
+              key: const Key('model-viewer-camera-scale'),
+              scale: pose.scale,
+              duration: const Duration(milliseconds: 650),
+              curve: Curves.easeInOutCubic,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 420),
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeIn,
+                layoutBuilder: (currentChild, previousChildren) => Stack(
+                  fit: StackFit.expand,
+                  children: [...previousChildren, ?currentChild],
+                ),
+                child: ModelViewer(
+                  // Step/zoom are intentionally excluded: camera choreography
+                  // happens in Flutter without recreating the HTML/WebView.
+                  key: ValueKey('mv-model-$glbPath-$rotationDegrees'),
+                  id: 'cell-forensic-model',
+                  src: src,
+                  alt: 'Meja laboratorium forensik sel',
+                  ar: false,
+                  autoRotate: false,
+                  cameraControls: true,
+                  disableZoom: false,
+                  cameraOrbit: '0deg 72deg 105%',
+                  cameraTarget:
+                      '${cameraTarget.x}m ${cameraTarget.y}m ${cameraTarget.z}m',
+                  minCameraOrbit: 'auto 25deg 70%',
+                  maxCameraOrbit: 'auto 90deg 250%',
+                  fieldOfView: '30deg',
+                  minFieldOfView: '20deg',
+                  maxFieldOfView: '45deg',
+                  interpolationDecay: 100,
+                  orientation: '0deg 0deg ${rotationDegrees}deg',
+                  scale: '$normalizedScale $normalizedScale $normalizedScale',
+                  backgroundColor: const Color(0xFF1A1F24),
+                  loading: Loading.eager,
+                  relatedCss: 'body{margin:0;background:#1A1F24}',
+                ),
+              ),
+            ),
           ),
-          id: 'cell-forensic-model',
-          src: src,
-          alt: 'Meja laboratorium forensik sel',
-          ar: false,
-          autoRotate: false,
-          cameraControls: true,
-          disableZoom: false,
-          cameraOrbit: orbit,
-          cameraTarget:
-              '${cameraTarget.x}m ${cameraTarget.y}m ${cameraTarget.z}m',
-          minCameraOrbit: 'auto 25deg 70%',
-          maxCameraOrbit: 'auto 90deg 250%',
-          fieldOfView: '30deg',
-          minFieldOfView: '20deg',
-          maxFieldOfView: '45deg',
-          orientation: '0deg 0deg ${rotationDegrees}deg',
-          scale: '$normalizedScale $normalizedScale $normalizedScale',
-          backgroundColor: const Color(0xFF1A1F24),
-          loading: Loading.eager,
-          relatedCss: 'body{margin:0;background:#1A1F24}',
-        ),
-        // model_viewer cannot render native material glow/particles. Flutter
-        // overlays provide the same visible sequence beats as live AR.
-        buildSequenceOverlay(visual),
-        _buildModelTapLayer(dualSamples: false),
-      ],
+          // These stay in the focused screen frame while the authored merged
+          // scene moves behind them, matching the active A/B target.
+          buildSequenceOverlay(visual, dualSamples: _showsBothSamples),
+          if (_supportsPlantHotspots)
+            _buildModelTapLayer(dualSamples: _showsBothSamples),
+        ],
+      ),
     );
   }
 
@@ -1081,8 +1170,9 @@ class _MissionScenePanelState extends State<MissionScenePanel>
           planeDetectionConfig: PlaneDetectionConfig.horizontal,
         ),
         if (_scanPhase == ArScanPhase.placed) ...[
-          buildSequenceOverlay(visual),
-          _buildHotspotLayer(dualSamples: visual.secondaryModelPath != null),
+          buildSequenceOverlay(visual, dualSamples: _showsBothSamples),
+          if (_supportsPlantHotspots)
+            _buildHotspotLayer(dualSamples: _showsBothSamples),
         ],
         if (_scanPhase != ArScanPhase.placed)
           Align(
