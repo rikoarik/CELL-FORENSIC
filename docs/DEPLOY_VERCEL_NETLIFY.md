@@ -51,7 +51,9 @@ ls -lh build/web/index.html build/web/main.dart.js
 ## 3. Deploy manual ke Vercel
 
 Repository sudah memiliki `vercel.json` yang menunjuk `build/web` dan
-me-rewrite deep link seperti `/guru` ke `index.html`.
+me-rewrite deep link seperti `/guru` ke `index.html`. Build Command Vercel
+menjalankan `bash scripts/vercel_build.sh`, sehingga Flutter SDK disiapkan oleh
+build server dan tidak perlu menempel command panjang di dashboard.
 
 Instal dan login Vercel CLI:
 
