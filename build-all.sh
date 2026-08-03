@@ -1,4 +1,3 @@
-
 #!/usr/bin/env bash
 #
 # build-all.sh — Opsi 2: satu site Netlify, dua path.
@@ -8,12 +7,30 @@
 #
 # Hasil akhir ada di folder dist/
 #
+# Env wajib — samakan dengan scripts/vercel_build.sh. Tanpa ini build
+# akan diam-diam memakai nilai default di lib/core/supabase/supabase_config.dart.
+#
+#   SUPABASE_URL, SUPABASE_ANON_KEY
+#
 set -euo pipefail
+
+: "${SUPABASE_URL:?Set SUPABASE_URL di Netlify Environment Variables}"
+: "${SUPABASE_ANON_KEY:?Set SUPABASE_ANON_KEY di Netlify Environment Variables}"
 
 OUT="dist"
 
+# Dipakai kedua target supaya siswa dan guru menunjuk ke backend yang sama.
+DEFINES=(
+  --dart-define=APP_FLAVOR=prod
+  --dart-define="SUPABASE_URL=$SUPABASE_URL"
+  --dart-define="SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"
+)
+
 echo "▶ Bersihkan output lama"
 rm -rf "$OUT"
+
+echo "▶ flutter pub get"
+flutter pub get
 
 # ---------------------------------------------------------------
 # 1. App siswa -> root
@@ -21,7 +38,8 @@ rm -rf "$OUT"
 echo "▶ Build siswa (lib/main.dart) dengan base-href /"
 flutter build web --release \
   --target lib/main.dart \
-  --base-href /
+  --base-href / \
+  "${DEFINES[@]}"
 
 cp -r build/web "$OUT"
 
@@ -31,7 +49,8 @@ cp -r build/web "$OUT"
 echo "▶ Build guru (lib/main_dashboard.dart) dengan base-href /guru/"
 flutter build web --release \
   --target lib/main_dashboard.dart \
-  --base-href /guru/
+  --base-href /guru/ \
+  "${DEFINES[@]}"
 
 cp -r build/web "$OUT/guru"
 
