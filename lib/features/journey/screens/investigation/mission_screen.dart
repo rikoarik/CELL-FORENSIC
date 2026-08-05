@@ -6,6 +6,7 @@ import 'package:cell_forensic/ar/ar_scene_engine.dart';
 import 'package:cell_forensic/ar/ar_visual_director.dart';
 import 'package:cell_forensic/ar/mission_scene_panel.dart';
 import 'package:cell_forensic/ar/organelle_hotspot.dart';
+import 'package:cell_forensic/core/config/ai_config.dart';
 import 'package:cell_forensic/core/supabase/supabase_config.dart';
 import 'package:cell_forensic/domain/ai/ai_assistant_client.dart';
 import 'package:cell_forensic/domain/ai/ar_action_whitelist.dart';
@@ -110,10 +111,13 @@ class _MissionScreenState extends State<MissionScreen> {
   }
 
   AiAssistantClient? _resolveAiClient() {
-    if (!SupabaseConfig.isConfigured || SupabaseConfig.clientOrNull == null) {
-      return null;
+    if (AiConfig.isConfigured) {
+      return DirectOpenAiAssistantClient();
     }
-    return const SupabaseAiAssistantClient();
+    if (SupabaseConfig.isConfigured && SupabaseConfig.clientOrNull != null) {
+      return const SupabaseAiAssistantClient();
+    }
+    return null;
   }
 
   void _onAssistantChanged() {
@@ -830,10 +834,10 @@ class _MissionScreenState extends State<MissionScreen> {
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
               child: Text(
                 _assistantVm.cloudUnavailable
-                    ? 'Mode lokal — Edge AI belum siap (cek OPENAI_API_KEY).'
+                    ? 'Mode lokal — AI cloud belum siap (cek OPENAI_API_KEY).'
                     : (_assistantVm.cloudConfigured
-                          ? 'Mode cloud (Supabase ai-assistant)'
-                          : 'Mode lokal — Supabase belum dikonfigurasi'),
+                          ? 'Mode cloud AI aktif'
+                          : 'Mode lokal — AI belum dikonfigurasi'),
                 key: const Key('assistant-cloud-status'),
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: _assistantVm.cloudUnavailable

@@ -30,6 +30,14 @@ flutter run -t lib/main_mobile.dart \
 
 Tanpa Supabase, app memakai content pack lokal (kode demo `CELL01`).
 
+Build APK production dengan credentials dari `.env`:
+
+```bash
+flutter build apk --release --dart-define-from-file=.env
+```
+
+Output: `build/app/outputs/flutter-apk/app-release.apk`
+
 ## Docs
 
 | Dokumen | Isi |
@@ -44,13 +52,27 @@ Tanpa Supabase, app memakai content pack lokal (kode demo `CELL01`).
 
 ### AI proxy secrets (server only)
 
-Set on Supabase Dashboard → Edge Functions → Secrets (never in Flutter / git):
+Set via Supabase Dashboard → Edge Functions → Secrets (never commit ke Flutter / git):
 
-- `OPENAI_API_KEY`
-- `OPENAI_BASE_URL=https://api.arklabs.biz.id/v1`
-- `OPENAI_MODEL=cell-forensik`
+```bash
+OPENAI_API_KEY=sk-your-key-here
+OPENAI_BASE_URL=https://api.arklabs.biz.id/v1
+OPENAI_MODEL=cell-forensik
+```
 
-Deploy: `supabase functions deploy ai-assistant`
+Deploy Edge Function:
+
+```bash
+supabase functions deploy ai-assistant
+```
+
+Atau set via CLI (sudah login `supabase login`):
+
+```bash
+supabase secrets set OPENAI_API_KEY=sk-your-key-here \
+  OPENAI_BASE_URL=https://api.arklabs.biz.id/v1 \
+  OPENAI_MODEL=cell-forensik
+```
 
 ## Flavors & CI
 

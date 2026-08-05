@@ -46,6 +46,8 @@ dependencies:
   vector_math: ^2.1.4
   supabase_flutter: ^2.16.0
   shared_preferences: ^2.5.3
+  http: ^1.2.0
+
 
 dev_dependencies:
   flutter_test:

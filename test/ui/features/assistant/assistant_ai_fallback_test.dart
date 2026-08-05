@@ -32,7 +32,10 @@ void main() {
 
     expect(fake.callCount, 1);
     expect(vm.messages.length, 2);
-    expect(vm.messages.last.text, 'Balasan lokal IntentMatcher.');
+    expect(
+      vm.messages.last.text,
+      'Balasan lokal IntentMatcher.\n\n(Asisten cloud tidak tersedia — petunjuk lokal.)',
+    );
     expect(vm.lastArAction, ArActionWhitelist.none);
     expect(actions, isEmpty);
     // Offline-equivalent fallback must still drive SequenceEngine.
